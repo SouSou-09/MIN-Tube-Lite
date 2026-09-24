@@ -409,6 +409,11 @@ function rankByRelevance(items, refTitle, refChannel, { minScore = 1, limit = 24
 
 app.get("/", (req, res) => {
   htmlCacheHeaders(res);
+  res.sendFile(path.join(__dirname, "public", "min-tube-lite.html"));
+});
+
+app.get("/home", (req, res) => {
+  htmlCacheHeaders(res);
   res.sendFile(path.join(__dirname, "public", "home.html"));
 });
 

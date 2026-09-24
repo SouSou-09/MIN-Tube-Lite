@@ -19,6 +19,29 @@
   <noscript><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet"></noscript>
   <style>
     :root {
+      --bg: #ffffff;
+      --surface: #f2f2f2;
+      --card: #f2f2f2;
+      --text: #0f0f0f;
+      --text-muted: #606060;
+      --text-secondary: #909090;
+      --accent: #0f0f0f;
+      /* --brand : ボタンや強調用の青系。--accent (テキスト色) を背景に流用すると
+         文字色 #fff と同化して見えなくなるため、ボタン背景は --brand を使う */
+      --brand: #1a73e8;
+      --brand-hover: #1765c4;
+      --brand-text: #ffffff;
+      --yt-red: #ff0000;
+      --border: #e5e5e5;
+      --chip-bg: rgba(0,0,0,0.05);
+      --chip-active-bg: #0f0f0f;
+      --chip-active-text: #ffffff;
+      --header-height: 56px;
+      --chips-height: 52px;
+      --sidebar-width: 240px;
+      --sidebar-collapsed: 72px;
+    }
+    body:not(.light-mode) {
       --bg: #0f0f0f;
       --surface: #212121;
       --card: #272727;
@@ -26,20 +49,13 @@
       --text-muted: #aaaaaa;
       --text-secondary: #717171;
       --accent: #f1f1f1;
-      /* --brand : ボタンや強調用の青系。--accent (テキスト色) を背景に流用すると
-         文字色 #fff と同化して見えなくなるため、ボタン背景は --brand を使う */
       --brand: #3ea6ff;
       --brand-hover: #65b8ff;
       --brand-text: #0f0f0f;
-      --yt-red: #ff0000;
       --border: #3f3f3f;
       --chip-bg: rgba(255,255,255,0.1);
       --chip-active-bg: #f1f1f1;
       --chip-active-text: #0f0f0f;
-      --header-height: 56px;
-      --chips-height: 52px;
-      --sidebar-width: 240px;
-      --sidebar-collapsed: 72px;
     }
     body.light-mode {
       --bg: #ffffff;

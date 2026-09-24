@@ -3811,5 +3811,24 @@ if (!currentUrl.includes("projects") && !currentUrl.includes("private") && !curr
     ライブラリ
   </button>
 </nav>
+
+  <script>
+    // ── Theme default: classic light (YouTube default). Explicit saved 'dark' wins. ──
+    (function () {
+      try {
+        var saved = null;
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i), v = localStorage.getItem(k);
+          if (v === 'dark' || v === 'light') { saved = v; break; }
+        }
+        if (saved !== 'dark') {
+          document.body.classList.add('light-mode');
+          var dl = document.getElementById('themeDark'), ll = document.getElementById('themeLight');
+          if (dl) dl.checked = false;
+          if (ll) ll.checked = true;
+        }
+      } catch (e) {}
+    })();
+  </script>
 </body>
 </html>

@@ -5,6 +5,10 @@
 `/changelog` ページおよび `/api/changelog` はこのファイルをパースして表示します。
 
 ## 更新履歴
+
+### v1.1.0
+**🔄 ページ構成の修正**
+- `home.html` と `min-tube-lite.html` の中身が入れ替わっていた問題を修正しました。
 ### v1.0.0
 **🚀 Lite 初版**
 - MIN-Tube-Slim から「MIN-Tube-Lite」へリニューアルし、ここから新たにスタートしました。

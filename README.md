@@ -13,15 +13,15 @@ https://min-tube-slim.duckdns.org
 
 ### Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/SouSou-09/MIN-Tube-Slim)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/SouSou-09/MIN-Tube-Lite)
 
 ### Render
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/SouSou-09/MIN-Tube-Slim)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/SouSou-09/MIN-Tube-Lite)
 
 ### Railway
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https://github.com/SouSou-09/MIN-Tube-Slim)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https://github.com/SouSou-09/MIN-Tube-Lite)
 
 ---
 
@@ -29,7 +29,7 @@ https://min-tube-slim.duckdns.org
 
 ### v1.0.0（Lite 初版）
 
-- MIN-Tube-Slim から「MIN-Tube-Lite」として再スタートしました。
+- MIN-Tube-Lite から「MIN-Tube-Lite」として再スタートしました。
 - これまでの変更履歴はリセット済みです。新しい履歴はここから始まります。
 - アプリ内の更新履歴は `/changelog` ページでも確認できます。
 

@@ -29,7 +29,7 @@ https://min-tube-slim.duckdns.org
 
 ### v1.0.0（Lite 初版）
 
-- MIN-Tube-Lite から「MIN-Tube-Lite」として再スタートしました。
+- MIN-Tube-Slim から「MIN-Tube-Lite」として再スタートしました。
 - これまでの変更履歴はリセット済みです。新しい履歴はここから始まります。
 - アプリ内の更新履歴は `/changelog` ページでも確認できます。
 

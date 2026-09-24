@@ -3821,12 +3821,21 @@ if (!currentUrl.includes("projects") && !currentUrl.includes("private") && !curr
           var k = localStorage.key(i), v = localStorage.getItem(k);
           if (v === 'dark' || v === 'light') { saved = v; break; }
         }
-        if (saved !== 'dark') {
+        var applyLight = function () {
+          if (saved === 'dark') return;
           document.body.classList.add('light-mode');
+          document.body.style.background = '';
+          document.documentElement.style.background = '';
           var dl = document.getElementById('themeDark'), ll = document.getElementById('themeLight');
           if (dl) dl.checked = false;
           if (ll) ll.checked = true;
-        }
+        };
+        applyLight();
+        document.addEventListener('DOMContentLoaded', applyLight);
+        window.addEventListener('load', applyLight);
+        setTimeout(applyLight, 50);
+        setTimeout(applyLight, 300);
+        setTimeout(applyLight, 1000);
       } catch (e) {}
     })();
   </script>

@@ -13,15 +13,15 @@ https://min-tube-slim.duckdns.org
 
 ### Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Sou930/MIN-Tube-Lite)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/SouSou-09/MIN-Tube-Slim)
 
 ### Render
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Sou930/MIN-Tube-Lite)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/SouSou-09/MIN-Tube-Slim)
 
 ### Railway
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?templateUrl=https://github.com/Sou930/MIN-Tube-Lite)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https://github.com/SouSou-09/MIN-Tube-Slim)
 
 ---
 

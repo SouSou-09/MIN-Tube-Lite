@@ -555,7 +555,7 @@ async function searchViaStudy2525(query, page = 0, timeoutMs = 3500) {
   for (const base of STUDY2525_BASES) {
     try {
       const url = `${base}/api/v1/search?q=${encodeURIComponent(query)}&page=${parseInt(page) + 1}`;
-      const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0 MIN-Tube-Slim/1.3.3' } }, timeoutMs);
+      const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0 MIN-Tube-Lite/1.3.3' } }, timeoutMs);
       if (!r.ok) continue;
       const data = await r.json().catch(() => null);
       const items = normalizeStudy2525Items(data);
@@ -752,7 +752,7 @@ app.get('/playlist', async (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html><html lang="ja"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>プレイリスト - MIN-Tube-Slim</title>
+<title>プレイリスト - MIN-Tube-Lite</title>
 <script>(function(){try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.add('light-mode');}}catch(e){}})();</script>
 <style>
   :root{ --bg:#0f0f0f; --text:#f1f1f1; --muted:#a0a0a0; --brand:#5aa9ff; --card:#1a1a1a; --hover:rgba(255,255,255,0.05); --radius:14px; }
@@ -817,7 +817,7 @@ app.get('/playlist-play', (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html><html lang="ja"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>プレイリスト再生 - MIN-Tube-Slim</title>
+<title>プレイリスト再生 - MIN-Tube-Lite</title>
 <link rel="icon" href="/min-img.png">
 <script>(function(){try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.add('light-mode');}}catch(e){}})();</script>
 <style>
@@ -890,7 +890,7 @@ app.get('/playlist-play', (req, res) => {
 </style></head><body>
 <div class="topbar">
   <a class="back" href="/">←&nbsp;ホーム</a>
-  <span class="brand">MIN-Tube<b>-Slim</b></span>
+  <span class="brand">MIN-Tube<b>-Lite</b></span>
 </div>
 <div class="layout">
   <div class="main">
@@ -1430,7 +1430,7 @@ app.get('/changelog', (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html><html lang="ja"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>更新履歴 - MIN-Tube-Slim</title>
+<title>更新履歴 - MIN-Tube-Lite</title>
 <link rel="icon" href="/min-img.png">
 <script>(function(){try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.add('light-mode');}}catch(e){}})();</script>
 <style>
@@ -1461,11 +1461,11 @@ app.get('/changelog', (req, res) => {
 </style></head><body>
 <div class="topbar">
   <a class="back" href="/">←&nbsp;ホーム</a>
-  <span class="brand">MIN-Tube<b>-Slim</b></span>
+  <span class="brand">MIN-Tube<b>-Lite</b></span>
 </div>
 <div class="container">
   <h1>更新履歴</h1>
-  <div class="sub">MIN-Tube-Slim のアップデート内容を確認できます。</div>
+  <div class="sub">MIN-Tube-Lite のアップデート内容を確認できます。</div>
   <div id="clRoot"><div class="empty">読み込み中…</div></div>
 </div>
 <script>
@@ -3821,13 +3821,13 @@ app.get('/ai-fetch/:videoId', async (req, res) => {
 });
 
 // アプリランチャー（ホーム）
-// 新ルート: /launcher, /min-tube-slim
+// 新ルート: /launcher, /min-tube-lite
 // 旧ルート: /youtube-pro (後方互換)
 const _launcherHandler = (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "min-tube-slim.html"));
+  res.sendFile(path.join(__dirname, "public", "min-tube-lite.html"));
 };
 app.get("/launcher", _launcherHandler);
-app.get("/min-tube-slim", _launcherHandler);
+app.get("/min-tube-lite", _launcherHandler);
 app.get("/youtube-pro", _launcherHandler);
 
 // ===== Browser OS (MinOS) =====
@@ -3836,7 +3836,7 @@ app.get(["/os", "/min-os", "/desktop"], (req, res) => {
 });
 
 app.get("/min-img.png", (req, res) => {
-  const filePath = path.join(__dirname, "img", "min-tube-slim.png");
+  const filePath = path.join(__dirname, "img", "min-tube-lite.png");
   res.sendFile(filePath);
 });
 
@@ -4219,7 +4219,7 @@ app.get("/api/version", (req, res) => {
   try {
     const vPath = path.join(__dirname, "public", "raw/version.json");
     const data = JSON.parse(fs.readFileSync(vPath, "utf-8"));
-    res.json({ ...data, name: "MIN-Tube-Slim", api: "v1" });
+    res.json({ ...data, name: "MIN-Tube-Lite", api: "v1" });
   } catch (e) {
     res.status(500).json({ error: "Failed to read version" });
   }
@@ -4468,7 +4468,7 @@ app.get("/channel/:channelName", (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${channelName} - MIN-Tube-Slim</title>
+  <title>${channelName} - MIN-Tube-Lite</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <script>(function(){try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.add('light-mode');}}catch(e){}})();</script>
@@ -5118,7 +5118,7 @@ const calculateScore = (v) => {
 };
 
 app.get('/check-version', async (req, res) => {
-    const remoteUrl = 'https://raw.githubusercontent.com/Sou930/MIN-Tube-Slim/refs/heads/main/public/raw/version.json';
+    const remoteUrl = 'https://raw.githubusercontent.com/Sou930/MIN-Tube-Lite/refs/heads/main/public/raw/version.json';
     const localPath = path.join(__dirname, 'public', 'raw', 'version.json');
 
     try {

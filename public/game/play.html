@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>プレイ中 — MIN-Tube-Slim Games</title>
+  <title>プレイ中 — MIN-Tube-Lite Games</title>
   <style>
     :root {
       --bg: linear-gradient(135deg, #0f1724, #071029);
@@ -97,7 +97,7 @@
         <span id="gameEmoji" style="font-size:20px">🎮</span>
         <div style="min-width:0">
           <div class="game-name" id="gameName">読み込み中…</div>
-          <div class="game-sub" style="font-size:11px;color:var(--muted)">MIN-Tube-Slim Games</div>
+          <div class="game-sub" style="font-size:11px;color:var(--muted)">MIN-Tube-Lite Games</div>
         </div>
       </div>
       <div class="live-badge" id="liveBadge" style="display:none"><div class="live-dot"></div><span>プレイ中</span></div>
@@ -161,7 +161,7 @@
         currentGame = games.find(g => g.key === gameKey);
         if (!currentGame) throw new Error('ゲームが見つかりません');
 
-        document.title = `${currentGame.name} — MIN-Tube-Slim`;
+        document.title = `${currentGame.name} — MIN-Tube-Lite`;
         $('gameName').textContent = currentGame.name;
         $('gameEmoji').textContent = currentGame.emoji;
         $('loadingGameName').textContent = currentGame.name;

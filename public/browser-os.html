@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>MinOS — MIN-Tube-Slim Browser OS</title>
+<title>MinOS — MIN-Tube-Lite Browser OS</title>
 <link rel="icon" href="/min-img.png" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
 <style>
@@ -287,7 +287,7 @@
 <div id="boot">
   <div class="logo"><span class="material-symbols-rounded">desktop_windows</span></div>
   <div class="title">MinOS</div>
-  <div class="sub">Powered by MIN-Tube-Slim</div>
+  <div class="sub">Powered by MIN-Tube-Lite</div>
   <div class="spinner"></div>
 </div>
 
@@ -346,12 +346,12 @@
 
 <script>
 /* ============================================================
-   MinOS — ブラウザOS for MIN-Tube-Slim
+   MinOS — ブラウザOS for MIN-Tube-Lite
    ============================================================ */
 
 // アプリ定義
 const APPS = [
-  { id:'mintube',  name:'MIN-Tube',     icon:'smart_display', color:['#ef4444','#f97316'], url:'/min-tube-slim', w:1100, h:680, desktop:true },
+  { id:'mintube',  name:'MIN-Tube',     icon:'smart_display', color:['#ef4444','#f97316'], url:'/min-tube-lite', w:1100, h:680, desktop:true },
   { id:'search',   name:'検索',         icon:'search',        color:['#3b82f6','#06b6d4'], url:'/app/search.html', w:1000, h:640, desktop:true },
   { id:'ai',       name:'AI チャット',  icon:'smart_toy',     color:['#8b5cf6','#ec4899'], url:'/ai', w:900, h:640, desktop:true },
   { id:'anime',    name:'アニメ',       icon:'animation',     color:['#ec4899','#f43f5e'], url:'/anime', w:1000, h:640, desktop:true },
@@ -555,10 +555,10 @@ function createAboutWindow(app){
       </div>
       <div style="font-size:22px;font-weight:700">MinOS v1.0</div>
       <div style="font-size:13px;color:#94a3b8;line-height:1.6">
-        MIN-Tube-Slim 上で動作する<br>
+        MIN-Tube-Lite 上で動作する<br>
         ブラウザ完結型のデスクトップOS<br>
       </div>
-      <div style="font-size:11px;color:#64748b;margin-top:8px">© ${new Date().getFullYear()} mino — Powered by MIN-Tube-Slim</div>
+      <div style="font-size:11px;color:#64748b;margin-top:8px">© ${new Date().getFullYear()} mino — Powered by MIN-Tube-Lite</div>
     </div>
   `;
   layer.appendChild(el);

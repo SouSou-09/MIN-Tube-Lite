@@ -2,7 +2,7 @@
   "name": "クラスルーム",
   "short_name": "クラスルーム",
   "description": "アプリランチャー — すばやく、快適に",
-  "start_url": "/public/min-tube-slim.html",
+  "start_url": "/public/min-tube-lite.html",
   "display": "standalone",
   "background_color": "#0f1724",
   "theme_color": "#00d4ff",

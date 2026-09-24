@@ -1,10 +1,10 @@
-// MIN-Tube-Slim Service Worker (v2 - performance optimized)
-const STATIC_CACHE = 'min-tube-slim-static-v2';
-const RUNTIME_CACHE = 'min-tube-slim-runtime-v2';
+// MIN-Tube-Lite Service Worker (v2 - performance optimized)
+const STATIC_CACHE = 'min-tube-lite-static-v2';
+const RUNTIME_CACHE = 'min-tube-lite-runtime-v2';
 
 const PRECACHE = [
-  '/public/min-tube-slim.html',
-  '/img/min-tube-slim.png',
+  '/public/min-tube-lite.html',
+  '/img/min-tube-lite.png',
   '/manifest.json',
 ];
 

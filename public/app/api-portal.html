@@ -986,7 +986,7 @@
     /* ===== Theme toggle (persist) ===== */
     const themeBtn = document.getElementById('themeToggle');
     function applyTheme(t){
-      if(t==='light'){ document.body.classList.add('light-mode'); }
+      if(t!=='dark'){ document.body.classList.add('light-mode'); }
       else { document.body.classList.remove('light-mode'); }
     }
     applyTheme(localStorage.getItem('mtp_theme') || 'dark');

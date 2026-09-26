@@ -3235,10 +3235,50 @@ if (!currentUrl.includes("projects") && !currentUrl.includes("private") && !curr
       const FIRST_POLL_DELAY_MS = 8 * 1000;   // 初回は8秒後
       const SEEN_KEY_PREFIX = 'sub_lastseen_';
       const KNOWN_KEY_PREFIX = 'sub_known_';   // チャンネルごとに既知の動画ID集合(JSON配列)を保持
-      const MAX_KNOWN_PER_CH = 30;
+      const MAX_KNOWN_PER_CH = 200;
       const TOAST_AUTO_HIDE_MS = 9000;
       const NOTIFY_KEY_PREFIX = 'notify_';     // 通知ベル有効化フラグ
       const SHOWN_TOAST_KEY = 'sub_shown_toast_'; // セッション中で同じ動画を二重トーストしないため
+
+      const MAX_AGE_SEC = 48 * 60 * 60; // 48時間以内の投稿のみ通知（古い動画の誤通知防止）
+      function normCh(s) {
+        return String(s || '').trim().toLowerCase().replace(/\s+/g, '');
+      }
+      function videoChannelOf(v) {
+        return v.channelName || v.channel_title || v.channelTitle || v.channel || v.author || '';
+      }
+      function localParsePublished(text) {
+        if (!text) return Infinity;
+        const t = String(text);
+        const m = t.match(/(\d+)\s*(秒|分|時間|日|週間|か月|ヶ月|カ月|年|second|minute|hour|day|week|month|year)/i);
+        if (m) {
+          const n = parseInt(m[1], 10);
+          const u = m[2];
+          const mul = {
+            '秒':1,'second':1,'分':60,'minute':60,'時間':3600,'hour':3600,
+            '日':86400,'day':86400,'週間':604800,'week':604800,
+            'か月':2592000,'ヶ月':2592000,'カ月':2592000,'month':2592000,
+            '年':31536000,'year':31536000
+          };
+          const key = Object.keys(mul).find(k => u.toLowerCase().startsWith(k.toLowerCase())) || u;
+          return n * (mul[key] || mul[u] || 0);
+        }
+        const ms = Date.parse(t);
+        if (!isNaN(ms)) return Math.floor((Date.now() - ms) / 1000);
+        return Infinity;
+      }
+      function pubAgeSec(v) {
+        return localParsePublished(v.published || v.publishedText || v.date || v.publishedAt || v.ago || '');
+      }
+      function scopeToChannel(videos, ch) {
+        // /api/channel はキーワード検索なので別チャンネルの動画が混ざる — 登録チャンネル名と一致するものだけに絞る
+        const target = normCh(ch);
+        const matched = videos.filter(v => {
+          const c = normCh(videoChannelOf(v));
+          return c && (c === target || c.includes(target) || target.includes(c));
+        });
+        return matched.length > 0 ? matched : videos;
+      }
 
       function getSubscribedChannels() {
         const channels = [];
@@ -3358,13 +3398,14 @@ if (!currentUrl.includes("projects") && !currentUrl.includes("private") && !curr
             setKnown(ch, currentIds);
           } else {
             // 既知に無い新着のみ通知（最大3本まで）
-            const newVideos = videos.filter(v => v && v.id && !knownSet.has(v.id)).slice(0, 3);
+            const scopedVideos = scopeToChannel(videos, ch);
+            const newVideos = scopedVideos.filter(v => v && v.id && !knownSet.has(v.id) && (pubAgeSec(v) === Infinity || pubAgeSec(v) <= MAX_AGE_SEC)).slice(0, 3);
             if (newVideos.length > 0 && isNotifyOnFor(ch)) {
               for (const v of newVideos) {
                 const payload = {
                   id: v.id,
                   title: v.title || '',
-                  channel: ch
+                  channel: videoChannelOf(v) || ch
                 };
                 showInAppToast(payload);
                 addToNotificationPanel(payload);

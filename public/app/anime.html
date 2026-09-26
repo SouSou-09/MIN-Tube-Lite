@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0a0612">
+<meta name="theme-color" content="#f9f9f9">
 <title>MIN-PRO-ANIME — 最高のアニメ視聴体験</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,36 +11,36 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Orbitron:wght@600;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  /* ===== COLOR SYSTEM (Anime-noir palette) ===== */
-  --p1:#a855f7;        /* main violet */
-  --p2:#ec4899;        /* pink */
-  --p3:#06b6d4;        /* cyan accent */
+  /* ===== COLOR SYSTEM (YouTube light palette) ===== */
+  --p1:#ff0000;        /* main red (YouTube) */
+  --p2:#e62117;        /* deep red */
+  --p3:#065fd4;        /* link blue */
   --p4:#f59e0b;        /* gold (premium) */
-  --grad-main:linear-gradient(135deg,#a855f7 0%,#ec4899 50%,#f97316 100%);
-  --grad-sub:linear-gradient(135deg,#06b6d4,#a855f7);
+  --grad-main:linear-gradient(135deg,#ff0000 0%,#e62117 50%,#cc0000 100%);
+  --grad-sub:linear-gradient(135deg,#065fd4,#ff0000);
 
-  --bg:#06030d;
-  --bg2:#0d0719;
-  --bg3:#15102a;
-  --bg4:#1d1740;
-  --surface:rgba(168,85,247,0.05);
-  --surface-h:rgba(168,85,247,0.10);
+  --bg:#f9f9f9;
+  --bg2:#f1f1f1;
+  --bg3:#e9e9e9;
+  --bg4:#e0e0e0;
+  --surface:rgba(0,0,0,0.03);
+  --surface-h:rgba(0,0,0,0.06);
 
-  --text:#f5f3ff;
-  --text2:#c4b5fd;
-  --text3:#7c6f99;
-  --text4:#4a4262;
+  --text:#0f0f0f;
+  --text2:#3d3d3d;
+  --text3:#606060;
+  --text4:#909090;
 
-  --glass:rgba(13,7,25,0.72);
-  --glass-strong:rgba(13,7,25,0.92);
-  --border:rgba(168,85,247,0.14);
-  --border-h:rgba(168,85,247,0.32);
-  --glow:0 0 50px rgba(168,85,247,0.18);
-  --glow-pink:0 0 50px rgba(236,72,153,0.18);
+  --glass:rgba(255,255,255,0.85);
+  --glass-strong:rgba(255,255,255,0.95);
+  --border:rgba(0,0,0,0.10);
+  --border-h:rgba(0,0,0,0.22);
+  --glow:0 2px 8px rgba(0,0,0,0.08);
+  --glow-pink:0 2px 8px rgba(0,0,0,0.08);
 
-  --shadow-1:0 4px 20px rgba(0,0,0,0.4);
-  --shadow-2:0 10px 40px rgba(0,0,0,0.55);
-  --shadow-3:0 30px 80px rgba(0,0,0,0.7);
+  --shadow-1:0 1px 4px rgba(0,0,0,0.10);
+  --shadow-2:0 4px 14px rgba(0,0,0,0.12);
+  --shadow-3:0 10px 30px rgba(0,0,0,0.15);
 
   --r-sm:10px;
   --r-md:16px;
@@ -793,6 +793,14 @@ kbd {
 }
 </style>
 <base target="_blank">
+<style>
+  /* YouTube-style light refinements */
+  body{font-family:'Inter','Noto Sans JP',sans-serif}
+  .bg{background:#f9f9f9;animation:none}
+  .bg-orb,.bg-grid,.bg-noise{display:none}
+  #loader{background:#f9f9f9}
+  #loader .ld-logo{color:#0f0f0f}
+</style>
 </head>
 <body>
 
@@ -817,7 +825,7 @@ kbd {
       <div class="brand-icon">▶</div>
       <div class="brand-info">
         <div class="brand-txt">MIN-PRO-ANIME</div>
-        <div class="brand-tag">OFFICIAL · HD</div>
+        <div class="brand-tag">v1.1.0 · HD</div>
       </div>
     </a>
     <div class="header-actions">

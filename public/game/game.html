@@ -7,12 +7,12 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root{
-      --bg1:#0f1724; --bg2:#071029; --accent:#00d4ff;
-      --glass:rgba(255,255,255,0.06); --card:rgba(255,255,255,0.03);
-      --glass-border:rgba(255,255,255,0.08); --radius:14px;
-      --glass-blur:10px; --text:#e6f7ff; --muted:#9fb7c9;
+      --bg1:#f9f9f9; --bg2:#f1f1f1; --accent:#ff0000;
+      --glass:rgba(0,0,0,0.03); --card:#ffffff;
+      --glass-border:#e5e5e5; --radius:14px;
+      --glass-blur:0px; --text:#0f0f0f; --muted:#606060;
       --gold: #ffd700; --silver: #c0c0c0; --bronze: #cd7f32;
-      --live: #4ade80;
+      --live: #16a34a;
     }
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;font-family:"Noto Sans JP",sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--text);-webkit-font-smoothing:antialiased}
@@ -133,6 +133,18 @@
 
     .count-bar{font-size:13px;color:var(--muted)}
     .count-bar span{color:var(--accent);font-weight:bold}
+    /* YouTube-style light refinements */
+    .hero{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+    .logo-icon{background:#f2f2f2;box-shadow:none;border-color:#e5e5e5}
+    .tagline{color:#606060}
+    .spark{background:#ff0000;box-shadow:0 0 6px rgba(255,0,0,.5)}
+    .back-btn:hover{color:#ff0000;background:rgba(255,0,0,0.06)}
+    .filter-tab.active{background:rgba(255,0,0,0.08);color:#ff0000;border-color:#ff0000}
+    .play-count{background:rgba(255,0,0,0.07);color:#ff0000;border-color:rgba(255,0,0,0.2)}
+    .play-btn{color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+    .thumb{background:#f2f2f2}
+    .rank-1{border-color:rgba(255,215,0,0.6)}
+    .ver-pill{margin-left:8px;padding:2px 8px;border-radius:10px;background:#f2f2f2;color:#606060;font-weight:700;font-size:11px}
   </style>
 </head>
 <body>
@@ -147,7 +159,7 @@
         <div class="logo-icon">🎮</div>
         <div>
           <div class="title">MIN-Tube-Lite Ranking</div>
-          <div class="tagline"><div class="spark"></div>リアルタイム・人気ランキング</div>
+          <div class="tagline"><div class="spark"></div>リアルタイム・人気ランキング<span class="ver-pill">v1.1.0</span></div>
         </div>
       </div>
       <!-- 同時接続数表示 -->

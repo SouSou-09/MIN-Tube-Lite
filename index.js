@@ -589,7 +589,9 @@ function mergeSearchResults(primary, secondary) {
 }
 
 app.get("/api/search", async (req, res, next) => {
-  const query = req.query.q;
+  const rawQuery = String(req.query.q || '');
+  // 装飾記号は上流検索の精度を下げるので取り除く（全部消えた場合は元のクエリを使う）
+  const query = rawQuery.replace(/[【】「」『』()（）\[\]<>＜＞]/g, ' ').replace(/\s+/g, ' ').trim() || rawQuery.trim();
   const page = parseInt(req.query.page) || 0;
   if (!query) return res.status(400).json({ error: "Query required" });
 
@@ -636,7 +638,12 @@ app.get("/api/search", async (req, res, next) => {
     const winner = await raceWithMinItems([ytsPromise, s2525Promise], 5);
 
     // 勝者の結果を即時レスポンス（高速化のキモ）
-    let items = winner.items;
+    // タイトル無し・サムネイル無しの壊れた結果は除外
+    let items = (winner.items || []).filter(it => {
+      if (!it || !it.title) return false;
+      const hasThumb = (it.thumbnail && Array.isArray(it.thumbnail.thumbnails) && it.thumbnail.thumbnails.length > 0) || !!it.thumbnailUrl;
+      return hasThumb || (it.type && it.type !== 'video');
+    });
     let nextPage = winner.nextPage;
 
     // チャンネル画像補完（タイムアウト短め・失敗は無視）
@@ -1567,11 +1574,15 @@ app.get("/api/recommendations", async (req, res) => {
     }
 
     // ★ 関連性スコアで並べ替え＋無関係な動画を除外（少なくとも1語以上一致 or 同一チャンネル）
-    let ranked = rankByRelevance(dedupedItems, title, channel, { minScore: 1, limit: 24 });
+    // ショート動画は関連パネルではノイズになりやすいので基本除外（不足時のみ補完）
+    const isShortVid = (it) => /#shorts|ショート/i.test(it.title || '');
+    const longPool = dedupedItems.filter(it => !isShortVid(it));
+    let ranked = rankByRelevance(longPool, title, channel, { minScore: 1, limit: 24 });
 
     // 関連動画が少なすぎる場合のフォールバック（元動画タイトルでの検索結果を緩く採用）
     if (ranked.length < 8) {
-      const extra = dedupedItems.filter(it => !ranked.includes(it)).slice(0, 24 - ranked.length);
+      const pool = longPool.length >= 8 ? longPool : dedupedItems;
+      const extra = pool.filter(it => !ranked.includes(it)).slice(0, 24 - ranked.length);
       ranked = [...ranked, ...extra];
     }
 

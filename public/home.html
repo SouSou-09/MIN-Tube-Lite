@@ -7,11 +7,11 @@
 
 <!-- PWA -->
 <link rel="manifest" href="/manifest.json" />
-<meta name="theme-color" content="#00d4ff" />
+<meta name="theme-color" content="#ffffff" />
 
 <!-- iOS / Safari -->
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="MIN-Tube-Lite" />
 <link rel="apple-touch-icon" href="/min-img.png" />
 
@@ -22,721 +22,361 @@
 <meta property="og:description" content="次世代アプリランチャー — すべてを、この一箇所に。" />
 <meta property="og:image" content="/min-img.png" />
 
-<!-- 高速読み込み: 早期接続 + ノンブロッキング フォント読み込み -->
+<!-- Fonts (YouTube と同じ Roboto + 日本語 Noto Sans JP) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="dns-prefetch" href="https://fonts.googleapis.com">
 <link rel="dns-prefetch" href="https://fonts.gstatic.com">
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet"></noscript>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet"></noscript>
 
 <style>
   :root {
-    --bg-base: #05070f;
-    --bg-elev-1: rgba(255, 255, 255, 0.04);
-    --bg-elev-2: rgba(255, 255, 255, 0.06);
-    --accent: #00d4ff;
-    --accent-2: #7b61ff;
-    --accent-3: #ff6fd8;
-    --text: #e6eaf2;
-    --text-dim: #8b94a8;
-    --text-faint: #5b6378;
-    --card-border: rgba(255, 255, 255, 0.08);
-    --card-border-hover: rgba(0, 212, 255, 0.4);
-    --radius-lg: 18px;
-    --radius-md: 14px;
-    --radius-sm: 10px;
-    --transition: 260ms cubic-bezier(0.22, 1, 0.36, 1);
+    --bg: #f9f9f9;
+    --surface: #ffffff;
+    --text: #0f0f0f;
+    --text-2: #606060;
+    --text-3: #909090;
+    --border: #e5e5e5;
+    --hover: #f2f2f2;
+    --chip-bg: #f2f2f2;
+    --chip-active: #0f0f0f;
+    --chip-active-text: #ffffff;
+    --red: #ff0000;
     --ok: #22c55e;
     --wip: #f43f5e;
+    --header-height: 56px;
+    --chips-height: 52px;
+    --radius: 12px;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  html { scroll-behavior: smooth; }
-
   body {
-    background: var(--bg-base);
+    background: var(--bg);
     color: var(--text);
-    font-family: 'Space Grotesk', 'Noto Sans JP', system-ui, sans-serif;
-    line-height: 1.55;
+    font-family: 'Roboto', 'Noto Sans JP', Arial, sans-serif;
+    line-height: 1.5;
     min-height: 100vh;
-    overflow-x: hidden;
-    -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    overflow-x: hidden;
   }
 
-  /* ── Background ── */
-  .mesh-bg {
-    position: fixed;
-    inset: 0;
-    z-index: -2;
-    pointer-events: none;
-    background:
-      radial-gradient(1100px 560px at 85% -10%, rgba(123, 97, 255, 0.16), transparent 60%),
-      radial-gradient(900px 520px at -5% 12%, rgba(0, 212, 255, 0.12), transparent 60%),
-      radial-gradient(700px 620px at 50% 115%, rgba(255, 111, 216, 0.08), transparent 60%);
-  }
-
-  .wrap {
-    max-width: 1080px;
-    margin: 0 auto;
-    padding: 0 20px calc(56px + env(safe-area-inset-bottom));
-  }
-
-  /* ── Sticky Top Bar ── */
-  .topbar {
+  /* ===== Header ===== */
+  header {
     position: sticky;
     top: 0;
-    z-index: 20;
+    z-index: 100;
+    height: var(--header-height);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 10px max(20px, env(safe-area-inset-left));
-    background: rgba(5, 7, 15, 0.72);
-    border-bottom: 1px solid var(--card-border);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    gap: 16px;
+    padding: 0 16px;
   }
-  .brand-mini {
-    display: flex; align-items: center; gap: 10px;
-    font-weight: 700;
-    font-size: 14px;
-    letter-spacing: 0.3px;
+  .header-left { display: flex; align-items: center; min-width: 0; }
+  .logo {
+    display: flex; align-items: center; gap: 0;
+    text-decoration: none; color: var(--text);
   }
-  .brand-mini img { width: 26px; height: 26px; border-radius: 8px; }
-  .nav-meta {
-    display: flex; align-items: center; gap: 12px;
-    font-size: 12px; color: var(--text-dim);
-    font-variant-numeric: tabular-nums;
+  .logo-icon { width: 34px; height: 24px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .logo-icon svg { width: 34px; height: 24px; }
+  .logo-text { font-size: 19px; font-weight: 700; letter-spacing: -1px; margin-left: 3px; white-space: nowrap; }
+  .logo-sub { font-size: 10px; color: var(--text-2); font-weight: 500; margin-left: 2px; align-self: flex-end; margin-bottom: 5px; }
+
+  .header-center { flex: 1; display: flex; justify-content: center; min-width: 0; }
+  .search-form {
+    display: flex; width: 100%; max-width: 480px; height: 40px;
+    border: 1px solid #cccccc; border-radius: 20px; overflow: hidden; background: var(--surface);
   }
-  .nav-meta .pill {
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: rgba(34,197,94,0.12);
-    color: #4ade80;
-    border: 1px solid rgba(34,197,94,0.25);
-    font-weight: 600;
-    font-size: 11px;
+  .search-form:focus-within { border-color: #1c62b9; box-shadow: inset 0 0 0 1px #1c62b9; }
+  .search-form input {
+    flex: 1; min-width: 0; border: none; outline: none;
+    padding: 0 14px; font-family: inherit; font-size: 14px; color: var(--text);
+    background: transparent;
+  }
+  .search-form input::placeholder { color: var(--text-3); }
+  .search-btn {
+    width: 52px; border: none; cursor: pointer;
+    background: #f8f8f8; border-left: 1px solid #d3d3d3;
+    display: flex; align-items: center; justify-content: center; color: #606060;
+    flex-shrink: 0;
+  }
+  .search-btn:hover { background: #f0f0f0; }
+
+  .header-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  .status-pill {
     display: inline-flex; align-items: center; gap: 6px;
-    white-space: nowrap;
+    padding: 4px 11px; border-radius: 999px;
+    background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3);
+    color: #15803d; font-size: 11px; font-weight: 600; white-space: nowrap;
   }
-  .nav-meta .pill::before {
-    content: '';
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #4ade80;
-    box-shadow: 0 0 8px #4ade80;
+  .status-pill::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ok); box-shadow: 0 0 6px var(--ok);
   }
+  .clock { font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 
-  /* ── Compact Hero ── */
-  .hero {
-    padding: 34px 0 20px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 20px;
-    flex-wrap: wrap;
-  }
-  .hero .hero-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 11px;
-    border-radius: 999px;
-    background: rgba(0,212,255,0.1);
-    border: 1px solid rgba(0,212,255,0.25);
-    color: var(--accent);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 1.2px;
-    text-transform: uppercase;
-    margin-bottom: 10px;
-  }
-  .hero h1 {
-    font-size: clamp(26px, 4vw, 36px);
-    font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.8px;
-    background: linear-gradient(135deg, #ffffff 25%, #a5b4fc 65%, #00d4ff 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-  .hero h1 .accent {
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-  .typewriter-container {
-    min-height: 22px;
-    display: flex; align-items: center;
-    margin-top: 6px;
-  }
-  .typewriter {
-    font-size: 13.5px;
-    color: var(--text-dim);
-    font-weight: 500;
-  }
-  .typewriter .cursor {
-    display: inline-block;
-    width: 2px; height: 1em;
-    background: var(--accent);
-    margin-left: 3px;
-    vertical-align: text-bottom;
-    animation: cursor-blink 1s steps(2) infinite;
-  }
-  @keyframes cursor-blink { 50% { opacity: 0; } }
-
-  .hero-side {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding-bottom: 4px;
-  }
-  .version-pill {
-    padding: 5px 12px;
-    border-radius: 999px;
-    border: 1px solid rgba(123,97,255,0.35);
-    background: rgba(123,97,255,0.12);
-    color: #b7aaff;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    font-variant-numeric: tabular-nums;
-  }
-  .apps-pill {
-    padding: 5px 12px;
-    border-radius: 999px;
-    border: 1px solid var(--card-border);
-    background: var(--bg-elev-1);
-    color: var(--text-dim);
-    font-size: 12px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* ── Controls: search + status filter ── */
-  .controls {
+  /* ===== Chips bar ===== */
+  .chips-bar {
     position: sticky;
-    top: 51px;
-    z-index: 15;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 12px 0 14px;
-    background: rgba(5, 7, 15, 0.85);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-bottom: 1px solid var(--card-border);
-    margin-bottom: 26px;
+    top: var(--header-height);
+    z-index: 90;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
   }
-  .search-box {
-    flex: 1;
-    min-width: 200px;
-    position: relative;
-  }
-  .search-box .search-icon {
-    position: absolute;
-    left: 13px; top: 50%;
-    transform: translateY(-50%);
-    font-size: 14px;
-    color: var(--text-faint);
-    pointer-events: none;
-  }
-  .search-box input {
-    width: 100%;
-    padding: 10px 14px 10px 38px;
-    border-radius: 12px;
-    border: 1px solid var(--card-border);
-    background: rgba(255,255,255,0.05);
-    color: var(--text);
-    font-family: inherit;
-    font-size: 14px;
-    outline: none;
-    transition: border-color var(--transition), box-shadow var(--transition);
-  }
-  .search-box input::placeholder { color: var(--text-faint); }
-  .search-box input:focus {
-    border-color: rgba(0,212,255,0.55);
-    box-shadow: 0 0 0 3px rgba(0,212,255,0.12);
-  }
-  .chips {
-    display: flex;
-    gap: 8px;
-  }
+  .chips-bar::-webkit-scrollbar { display: none; }
   .chip {
-    padding: 8px 14px;
-    border-radius: 999px;
-    border: 1px solid var(--card-border);
-    background: rgba(255,255,255,0.04);
-    color: var(--text-dim);
-    font-family: inherit;
-    font-size: 12.5px;
-    font-weight: 600;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    transition: color var(--transition), border-color var(--transition), background var(--transition);
+    flex-shrink: 0;
+    padding: 7px 14px; border-radius: 999px; border: none; cursor: pointer;
+    background: var(--chip-bg); color: var(--text);
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: background 120ms, color 120ms;
   }
+  .chip:hover { background: #e5e5e5; }
+  .chip[aria-pressed="true"] { background: var(--chip-active); color: var(--chip-active-text); }
+  .chip:focus-visible { outline: 2px solid #1c62b9; outline-offset: 2px; }
   .chip .dot { width: 7px; height: 7px; border-radius: 50%; }
-  .chip .dot.all   { background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
-  .chip .dot.done  { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
-  .chip .dot.wip   { background: var(--wip); box-shadow: 0 0 8px var(--wip); }
-  .chip:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-  .chip[aria-pressed="true"] {
-    color: #fff;
-    border-color: rgba(0,212,255,0.55);
-    background: rgba(0,212,255,0.1);
-  }
-  .chip:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+  .chip .dot.done { background: var(--ok); }
+  .chip .dot.wip  { background: var(--wip); }
+  .chip[aria-pressed="true"] .dot.done { background: #4ade80; }
+  .chip[aria-pressed="true"] .dot.wip  { background: #fb7185; }
+  .chips-divider { flex-shrink: 0; width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
 
-  /* ── Category sections ── */
-  .category-section { margin-bottom: 30px; }
-  .category-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
+  /* ===== Main ===== */
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 20px calc(48px + env(safe-area-inset-bottom)); }
+  .meta-line {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    margin: 4px 0 16px; color: var(--text-2); font-size: 13px;
   }
-  .cat-icon {
-    width: 30px; height: 30px;
-    background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
-    border: 1px solid var(--card-border);
-    border-radius: 9px;
-    display: grid; place-items: center;
-    font-size: 15px;
-  }
-  .cat-title {
-    font-size: 15.5px;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: -0.2px;
-  }
-  .cat-line {
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(90deg, rgba(255,255,255,0.12), transparent);
-  }
-  .cat-count {
-    font-size: 11px;
-    padding: 3px 10px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid var(--card-border);
-    border-radius: 999px;
-    color: var(--text-dim);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
+  .meta-line .title-sm { font-size: 16px; font-weight: 700; color: var(--text); }
+  .meta-line .ver { color: var(--text-3); font-variant-numeric: tabular-nums; }
 
-  /* ── App grid ── */
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 22px 16px;
   }
 
-  /* ── Card (compact launcher tile) ── */
+  /* ===== Card (YouTube video-card style) ===== */
   .card {
-    position: relative;
-    background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02));
-    border: 1px solid var(--card-border);
-    border-radius: var(--radius-md);
-    padding: 14px 16px;
-    overflow: hidden;
     cursor: pointer;
-    transition: transform var(--transition),
-                border-color var(--transition),
-                box-shadow var(--transition);
-    display: flex;
-    align-items: center;
-    gap: 13px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    isolation: isolate;
+    border-radius: var(--radius);
+    outline: none;
   }
-  .card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(135deg, rgba(0,212,255,0.5), rgba(123,97,255,0.4), rgba(255,111,216,0.3));
-    -webkit-mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
-            mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
-    -webkit-mask-composite: xor;
-            mask-composite: exclude;
-    opacity: 0;
-    transition: opacity var(--transition);
-    pointer-events: none;
-    z-index: 1;
-  }
-  .card:hover {
-    transform: translateY(-3px);
-    border-color: var(--card-border-hover);
-    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
-  }
-  .card:hover::before { opacity: 1; }
-  .card:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 3px;
-  }
-  .card:active { transform: translateY(-1px) scale(0.99); }
   .card.hidden { display: none; }
-  .card > * { position: relative; z-index: 2; }
-
-  .app-icon {
-    width: 44px; height: 44px;
-    background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02));
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px;
-    display: grid;
-    place-items: center;
-    font-size: 21px;
-    flex-shrink: 0;
-    transition: transform var(--transition), border-color var(--transition);
-  }
-  .card:hover .app-icon {
-    transform: rotate(-4deg) scale(1.06);
-    border-color: rgba(0, 212, 255, 0.5);
-  }
-
-  .app-info { flex: 1; min-width: 0; }
-  .app-name {
-    font-size: 14.5px;
-    font-weight: 700;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin-bottom: 2px;
-    letter-spacing: -0.2px;
-  }
-  .app-desc {
-    font-size: 12px;
-    color: var(--text-dim);
-    line-height: 1.5;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+  .card:focus-visible { outline: 2px solid #1c62b9; outline-offset: 4px; }
+  .thumb {
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius);
+    display: grid; place-items: center;
+    font-size: 44px;
     overflow: hidden;
-  }
-  .app-path {
-    flex-shrink: 0;
-    font-family: 'Space Grotesk', ui-monospace, monospace;
-    font-size: 10.5px;
-    background: rgba(0, 212, 255, 0.1);
-    color: var(--accent);
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-weight: 600;
-    border: 1px solid rgba(0, 212, 255, 0.15);
-    align-self: flex-start;
-  }
-
-  /* Status dot (pulse) */
-  .status-indicator {
-    width: 8px; height: 8px;
-    border-radius: 50%;
     position: relative;
-    flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.06);
+    transition: border-radius 160ms, box-shadow 160ms;
   }
+  .card:hover .thumb { border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+  .thumb.cat-video { background: linear-gradient(135deg, #fff1f0, #ffe1de); }
+  .thumb.cat-ent   { background: linear-gradient(135deg, #fefce8, #fdf0c9); }
+  .thumb.cat-proxy { background: linear-gradient(135deg, #eff6ff, #dbeafe); }
+  .thumb.cat-tools { background: linear-gradient(135deg, #f0fdf4, #d6f5e0); }
+  .thumb .path-tag {
+    position: absolute; right: 8px; bottom: 8px;
+    font-family: 'Roboto', ui-monospace, monospace;
+    font-size: 11px; font-weight: 700;
+    background: rgba(255,255,255,0.92); color: #374151;
+    padding: 2px 8px; border-radius: 6px;
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  .card-body { padding: 10px 2px 0; }
+  .card-title {
+    font-size: 15px; font-weight: 500; color: var(--text);
+    display: flex; align-items: center; gap: 7px;
+    line-height: 1.35; letter-spacing: -0.2px;
+  }
+  .status-indicator { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .status-indicator.done { background: var(--ok); }
   .status-indicator.wip  { background: var(--wip); }
-  .status-indicator.done::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: var(--ok);
-    animation: pulse 2.2s ease-out infinite;
+  .card-desc {
+    font-size: 12.5px; color: var(--text-2); margin-top: 3px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
-  @keyframes pulse {
-    0%   { transform: scale(1); opacity: 0.75; }
-    100% { transform: scale(3); opacity: 0; }
+  .card-meta {
+    margin-top: 5px; font-size: 11.5px; color: var(--text-3);
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   }
+  .card-meta .cat-name { color: var(--text-2); font-weight: 500; }
 
-  /* ── Empty state ── */
+  /* ===== Empty state ===== */
   .empty {
-    text-align: center;
-    padding: 44px 20px;
-    border: 1px dashed rgba(255,255,255,0.14);
-    border-radius: var(--radius-lg);
-    color: var(--text-dim);
-    font-size: 14px;
-    margin: 8px 0 30px;
+    text-align: center; padding: 48px 20px;
+    border: 1px dashed #d0d0d0; border-radius: var(--radius);
+    color: var(--text-2); font-size: 14px; margin-top: 8px;
   }
-  .empty .empty-title {
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 4px;
+  .empty .empty-title { font-weight: 700; color: var(--text); margin-bottom: 4px; }
+
+  /* ===== Footer ===== */
+  footer {
+    margin-top: 40px; padding: 20px 0; text-align: center;
+    border-top: 1px solid var(--border);
+    color: var(--text-3); font-size: 12px;
   }
 
-  /* ── Footer ── */
-  .page-footer {
-    margin-top: 44px;
-    padding: 22px 0;
-    text-align: center;
-    border-top: 1px solid var(--card-border);
-    color: var(--text-faint);
-    font-size: 12px;
-    letter-spacing: 0.4px;
+  /* ===== Responsive ===== */
+  @media (max-width: 768px) {
+    .status-pill { display: none; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 18px 12px; }
   }
-  .page-footer .footer-brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--text-dim);
-    font-weight: 600;
-  }
-  .page-footer .footer-brand .dotline { color: var(--accent); }
-
-  /* ── Entrance Animations ── */
-  .reveal {
-    opacity: 0;
-    transform: translateY(10px);
-    animation: reveal 0.55s var(--transition) forwards;
-  }
-  .reveal:nth-child(1) { animation-delay: 0.02s; }
-  .reveal:nth-child(2) { animation-delay: 0.07s; }
-  .reveal:nth-child(3) { animation-delay: 0.12s; }
-  .reveal:nth-child(4) { animation-delay: 0.17s; }
-  .reveal:nth-child(5) { animation-delay: 0.22s; }
-  @keyframes reveal { to { opacity: 1; transform: translateY(0); } }
-
-  /* ── Responsive ── */
-  @media (max-width: 640px) {
-    .wrap { padding: 0 14px 48px; }
-    .topbar { padding: 9px 14px; }
-    .grid { grid-template-columns: 1fr; }
-    .hero { padding: 24px 0 16px; }
-    .hero-side { padding-bottom: 0; }
-    .nav-meta .pill { display: none; }
-    .controls { top: 49px; }
-    .chips { width: 100%; }
-    .chip { flex: 1; justify-content: center; }
+  @media (max-width: 560px) {
+    header { gap: 10px; padding: 0 12px; }
+    .logo-text { font-size: 17px; }
+    .logo-sub { display: none; }
+    .header-right .clock { display: none; }
+    .grid { grid-template-columns: 1fr; gap: 20px; }
+    .thumb { font-size: 52px; }
+    .wrap { padding: 16px 14px calc(40px + env(safe-area-inset-bottom)); }
   }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.08);
-    border-radius: 10px;
-    border: 2px solid var(--bg-base);
-  }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(0,212,255,0.4); }
-
-  /* Reduced motion */
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-      animation-duration: 0.001ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.001ms !important;
-    }
+    *, *::before, *::after { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
   }
 </style>
 </head>
 <body>
 
-  <div class="mesh-bg" aria-hidden="true"></div>
+  <!-- Header -->
+  <header>
+    <div class="header-left">
+      <a href="/home" class="logo" aria-label="MIN-Tube-Lite Hub">
+        <span class="logo-icon" aria-hidden="true">
+          <svg viewBox="0 0 28.57 20" xmlns="http://www.w3.org/2000/svg"><path d="M27.9727 3.12324C27.6435 1.89323 26.6768 0.926623 25.4468 0.597366C23.2197 0 14.285 0 14.285 0C14.285 0 5.35042 0 3.12323 0.597366C1.89323 0.926623 0.926623 1.89323 0.597366 3.12324C0 5.35042 0 10 0 10C0 10 0 14.6496 0.597366 16.8768C0.926623 18.1068 1.89323 19.0734 3.12323 19.4026C5.35042 20 14.285 20 14.285 20C14.285 20 23.2197 20 25.4468 19.4026C26.6768 19.0734 27.6435 18.1068 27.9727 16.8768C28.5701 14.6496 28.5701 10 28.5701 10C28.5701 10 28.5677 5.35042 27.9727 3.12324Z" fill="#FF0000"/><path d="M11.4253 14.2854L18.8477 10.0004L11.4253 5.71533V14.2854Z" fill="white"/></svg>
+        </span>
+        <span class="logo-text">MIN-Tube-Lite</span>
+        <span class="logo-sub">Hub</span>
+      </a>
+    </div>
+    <div class="header-center">
+      <form class="search-form" role="search" onsubmit="return false;">
+        <input type="search" id="appSearch" placeholder="アプリを検索" aria-label="アプリを検索" autocomplete="off" />
+        <button type="submit" class="search-btn" aria-label="検索">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20.87 20.17l-5.59-5.59C16.35 13.35 17 11.75 17 10c0-3.87-3.13-7-7-7s-7 3.13-7 7 3.13 7 7 7c1.75 0 3.35-.65 4.58-1.71l5.59 5.59.7-.71zM10 16c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/></svg>
+        </button>
+      </form>
+    </div>
+    <div class="header-right">
+      <span class="status-pill" id="statusPill">All Systems Operational</span>
+      <span class="clock" id="clock" aria-live="polite">--:--</span>
+    </div>
+  </header>
 
-  <!-- Sticky Top Bar -->
-  <nav class="topbar" aria-label="グローバル">
-    <div class="brand-mini">
-      <img src="/min-img.png" alt="" />
-      <span>MIN-Tube-Lite</span>
-    </div>
-    <div class="nav-meta">
-      <span class="pill" id="statusPill">All Systems Operational</span>
-      <span id="clock" aria-live="polite">--:--</span>
-    </div>
-  </nav>
+  <!-- Chips: category + status filter -->
+  <div class="chips-bar" role="group" aria-label="フィルター">
+    <button type="button" class="chip cat-chip" data-cat="all" aria-pressed="true">すべて</button>
+    <button type="button" class="chip cat-chip" data-cat="video" aria-pressed="false">🎬 Video</button>
+    <button type="button" class="chip cat-chip" data-cat="ent" aria-pressed="false">🎮 Entertainment</button>
+    <button type="button" class="chip cat-chip" data-cat="proxy" aria-pressed="false">🔓 Proxy</button>
+    <button type="button" class="chip cat-chip" data-cat="tools" aria-pressed="false">🛠️ Tools</button>
+    <span class="chips-divider" aria-hidden="true"></span>
+    <button type="button" class="chip st-chip" data-st="all" aria-pressed="true">すべての状態</button>
+    <button type="button" class="chip st-chip" data-st="done" aria-pressed="false"><span class="dot done" aria-hidden="true"></span>実装済み</button>
+    <button type="button" class="chip st-chip" data-st="wip" aria-pressed="false"><span class="dot wip" aria-hidden="true"></span>開発中</button>
+  </div>
 
   <div class="wrap" role="main">
-
-    <!-- Compact Hero -->
-    <header class="hero reveal" role="banner">
-      <div class="hero-main">
-        <span class="hero-tag">App Launcher · v1.1.0</span>
-        <h1>MIN-Tube-<span class="accent">Lite</span></h1>
-        <div class="typewriter-container">
-          <span id="typewriter" class="typewriter"></span><span class="cursor" aria-hidden="true"></span>
-        </div>
-      </div>
-      <div class="hero-side" aria-label="バージョンとアプリ数">
-        <span class="version-pill">v1.1.0</span>
-        <span class="apps-pill"><span id="statApps">7</span> Apps</span>
-      </div>
-    </header>
-
-    <!-- Search + Status Filter -->
-    <div class="controls reveal" role="search">
-      <div class="search-box">
-        <span class="search-icon" aria-hidden="true">🔍</span>
-        <input type="search" id="appSearch" placeholder="アプリを検索…" aria-label="アプリを検索" autocomplete="off" />
-      </div>
-      <div class="chips" role="group" aria-label="ステータスで絞り込み">
-        <button type="button" class="chip" data-filter="all" aria-pressed="true"><span class="dot all" aria-hidden="true"></span>すべて</button>
-        <button type="button" class="chip" data-filter="done" aria-pressed="false"><span class="dot done" aria-hidden="true"></span>実装済み</button>
-        <button type="button" class="chip" data-filter="wip" aria-pressed="false"><span class="dot wip" aria-hidden="true"></span>開発中</button>
-      </div>
+    <div class="meta-line">
+      <span class="title-sm">アプリを選択</span>
+      <span class="ver">v1.1.0</span>
+      <span><span id="statApps">7</span> Apps</span>
     </div>
 
-    <!-- ── Category: Videos ── -->
-    <section class="category-section reveal" aria-labelledby="cat-video" data-category="video">
-      <div class="category-header">
-        <div class="cat-icon" aria-hidden="true">🎬</div>
-        <h2 class="cat-title" id="cat-video">Video Streaming</h2>
-        <div class="cat-line" aria-hidden="true"></div>
-        <div class="cat-count">2 Apps</div>
-      </div>
-      <div class="grid">
-        <article class="card" data-endpoint="/" data-status="done" data-name="Youtube-Lite MIN-Tube 動画" tabindex="0" role="link" aria-label="Youtube-Lite を開く">
-          <div class="app-icon" aria-hidden="true">▶️</div>
-          <div class="app-info">
-            <div class="app-name"><span class="status-indicator done" aria-hidden="true"></span> Youtube‑Lite</div>
-            <p class="app-desc">洗練された UI と高速サーバー処理で、最高級の視聴体験を。</p>
-          </div>
-          <span class="app-path">/</span>
-        </article>
+    <div class="grid" id="appGrid">
+      <article class="card" data-endpoint="/" data-category="video" data-status="done" data-name="Youtube-Lite MIN-Tube 動画" tabindex="0" role="link" aria-label="Youtube-Lite を開く">
+        <div class="thumb cat-video" aria-hidden="true">▶️<span class="path-tag">/</span></div>
+        <div class="card-body">
+          <div class="card-title"><span class="status-indicator done" aria-hidden="true"></span> Youtube‑Lite</div>
+          <p class="card-desc">洗練された UI と高速サーバー処理で、最高級の視聴体験を。</p>
+          <div class="card-meta"><span class="cat-name">Video Streaming</span> · Main</div>
+        </div>
+      </article>
 
-        <article class="card" data-endpoint="/dl-pro" data-status="done" data-name="STUDY2525 高速 軽量" tabindex="0" role="link" aria-label="STUDY2525 を開く">
-          <div class="app-icon" aria-hidden="true">⚡</div>
-          <div class="app-info">
-            <div class="app-name"><span class="status-indicator done" aria-hidden="true"></span> STUDY2525</div>
-            <p class="app-desc">平均 0.02 秒の超高速ロード。究極の YouTube 代替インスタンス。</p>
-          </div>
-          <span class="app-path">/dl-pro</span>
-        </article>
-      </div>
-    </section>
+      <article class="card" data-endpoint="/dl-pro" data-category="video" data-status="done" data-name="STUDY2525 高速 軽量" tabindex="0" role="link" aria-label="STUDY2525 を開く">
+        <div class="thumb cat-video" aria-hidden="true">⚡<span class="path-tag">/dl-pro</span></div>
+        <div class="card-body">
+          <div class="card-title"><span class="status-indicator done" aria-hidden="true"></span> STUDY2525</div>
+          <p class="card-desc">平均 0.02 秒の超高速ロード。究極の YouTube 代替インスタンス。</p>
+          <div class="card-meta"><span class="cat-name">Video Streaming</span> · Ultra-Fast</div>
+        </div>
+      </article>
 
-    <!-- ── Category: Entertainment ── -->
-    <section class="category-section reveal" aria-labelledby="cat-ent" data-category="ent">
-      <div class="category-header">
-        <div class="cat-icon" aria-hidden="true">🎮</div>
-        <h2 class="cat-title" id="cat-ent">Entertainment Hub</h2>
-        <div class="cat-line" aria-hidden="true"></div>
-        <div class="cat-count">2 Apps</div>
-      </div>
-      <div class="grid">
-        <article class="card" data-endpoint="/anime" data-status="done" data-name="ANIME Viewer アニメ" tabindex="0" role="link" aria-label="ANIME Viewer を開く">
-          <div class="app-icon" aria-hidden="true">✨</div>
-          <div class="app-info">
-            <div class="app-name"><span class="status-indicator done" aria-hidden="true"></span> ANIME Viewer</div>
-            <p class="app-desc">膨大なアニメライブラリ。好きな作品がここに見つかります。</p>
-          </div>
-          <span class="app-path">/anime</span>
-        </article>
+      <article class="card" data-endpoint="/anime" data-category="ent" data-status="done" data-name="ANIME Viewer アニメ" tabindex="0" role="link" aria-label="ANIME Viewer を開く">
+        <div class="thumb cat-ent" aria-hidden="true">✨<span class="path-tag">/anime</span></div>
+        <div class="card-body">
+          <div class="card-title"><span class="status-indicator done" aria-hidden="true"></span> ANIME Viewer</div>
+          <p class="card-desc">膨大なアニメライブラリ。好きな作品がここに見つかります。</p>
+          <div class="card-meta"><span class="cat-name">Entertainment</span> · Anime</div>
+        </div>
+      </article>
 
-        <article class="card" data-endpoint="/game/game.html" data-status="done" data-name="Games ゲーム ブラウザ" tabindex="0" role="link" aria-label="Games を開く">
-          <div class="app-icon" aria-hidden="true">🕹️</div>
-          <div class="app-info">
-            <div class="app-name"><span class="status-indicator done" aria-hidden="true"></span> Games</div>
-            <p class="app-desc">厳選されたブラウザゲーム集。休憩時間に気軽に遊べます。</p>
-          </div>
-          <span class="app-path">/game</span>
-        </article>
-      </div>
-    </section>
+      <article class="card" data-endpoint="/game/game.html" data-category="ent" data-status="done" data-name="Games ゲーム ブラウザ" tabindex="0" role="link" aria-label="Games を開く">
+        <div class="thumb cat-ent" aria-hidden="true">🕹️<span class="path-tag">/game</span></div>
+        <div class="card-body">
+          <div class="card-title"><span class="status-indicator done" aria-hidden="true"></span> Games</div>
+          <p class="card-desc">厳選されたブラウザゲーム集。休憩時間に気軽に遊べます。</p>
+          <div class="card-meta"><span class="cat-name">Entertainment</span> · Games</div>
+        </div>
+      </article>
 
-    <!-- ── Category: Proxy ── -->
-    <section class="category-section reveal" aria-labelledby="cat-proxy" data-category="proxy">
-      <div class="category-header">
-        <div class="cat-icon" aria-hidden="true">🔓</div>
-        <h2 class="cat-title" id="cat-proxy">Proxy Network</h2>
-        <div class="cat-line" aria-hidden="true"></div>
-        <div class="cat-count">2 Apps</div>
-      </div>
-      <div class="grid">
-        <article class="card" data-endpoint="/helios" data-status="done" data-name="Helios プロキシ マルチタブ" tabindex="0" role="link" aria-label="Helios を開く">
-          <div class="app-icon" aria-hidden="true">☀️</div>
-          <div class="app-info">
-            <div class="app-name"><span class="status-indicator done" aria-hidden="true"></span> Helios</div>
-            <p class="app-desc">マルチタブ対応プロキシ。並行ブラウジングに最適。</p>
-          </div>
-          <span class="app-path">/helios</span>
-        </article>
+      <article class="card" data-endpoint="/helios" data-category="proxy" data-status="done" data-name="Helios プロキシ マルチタブ" tabindex="0" role="link" aria-label="Helios を開く">
+        <div class="thumb cat-proxy" aria-hidden="true">☀️<span class="path-tag">/helios</span></div>
+        <div class="card-body">
+          <div class="card-title"><span class="status-indicator done" aria-hidden="true"></span> Helios</div>
+          <p class="card-desc">マルチタブ対応プロキシ。並行ブラウジングに最適。</p>
+          <div class="card-meta"><span class="cat-name">Proxy Network</span> · Multi-Tab</div>
+        </div>
+      </article>
 
-        <article class="card" data-endpoint="/gust" data-status="done" data-name="Gust プロキシ 軽量" tabindex="0" role="link" aria-label="Gust を開く">
-          <div class="app-icon" aria-hidden="true">🌪️</div>
-          <div class="app-info">
-            <div class="app-name"><span class="status-indicator done" aria-hidden="true"></span> Gust</div>
-            <p class="app-desc">超軽量プロキシ。フィルターをすり抜け、快適な速度を維持。</p>
-          </div>
-          <span class="app-path">/gust</span>
-        </article>
-      </div>
-    </section>
+      <article class="card" data-endpoint="/gust" data-category="proxy" data-status="done" data-name="Gust プロキシ 軽量" tabindex="0" role="link" aria-label="Gust を開く">
+        <div class="thumb cat-proxy" aria-hidden="true">🌪️<span class="path-tag">/gust</span></div>
+        <div class="card-body">
+          <div class="card-title"><span class="status-indicator done" aria-hidden="true"></span> Gust</div>
+          <p class="card-desc">超軽量プロキシ。フィルターをすり抜け、快適な速度を維持。</p>
+          <div class="card-meta"><span class="cat-name">Proxy Network</span> · Lightweight</div>
+        </div>
+      </article>
 
-    <!-- ── Category: Tools ── -->
-    <section class="category-section reveal" aria-labelledby="cat-tools" data-category="tools">
-      <div class="category-header">
-        <div class="cat-icon" aria-hidden="true">🛠️</div>
-        <h2 class="cat-title" id="cat-tools">Utility &amp; Tools</h2>
-        <div class="cat-line" aria-hidden="true"></div>
-        <div class="cat-count">1 App</div>
-      </div>
-      <div class="grid">
-        <article class="card" data-endpoint="/api-portal" data-status="done" data-name="API Portal API 開発者" tabindex="0" role="link" aria-label="API Portal を開く">
-          <div class="app-icon" aria-hidden="true">🔌</div>
-          <div class="app-info">
-            <div class="app-name"><span class="status-indicator done" aria-hidden="true"></span> API Portal</div>
-            <p class="app-desc">全 API を一覧・検索・ライブテストできる公式ポータル。認証不要。</p>
-          </div>
-          <span class="app-path">/api-portal</span>
-        </article>
-      </div>
-    </section>
+      <article class="card" data-endpoint="/api-portal" data-category="tools" data-status="done" data-name="API Portal API 開発者" tabindex="0" role="link" aria-label="API Portal を開く">
+        <div class="thumb cat-tools" aria-hidden="true">🔌<span class="path-tag">/api-portal</span></div>
+        <div class="card-body">
+          <div class="card-title"><span class="status-indicator done" aria-hidden="true"></span> API Portal</div>
+          <p class="card-desc">全 API を一覧・検索・ライブテストできる公式ポータル。認証不要。</p>
+          <div class="card-meta"><span class="cat-name">Utility &amp; Tools</span> · Developer</div>
+        </div>
+      </article>
+    </div>
 
-    <!-- Empty state (search / filter results) -->
     <div class="empty" id="emptyState" hidden>
       <div class="empty-title">一致するアプリがありません</div>
-      検索キーワードを短くするか、ステータスフィルターを変更してください。
+      検索キーワードを短くするか、チップでフィルターを変更してください。
     </div>
 
-    <footer class="page-footer">
-      <span class="footer-brand">
-        <span class="dotline">●</span> 2026 MIN-Tube-Lite Project
-      </span>
-      <span style="margin: 0 8px; color: var(--text-faint);">·</span>
+    <footer>
+      <span>● 2026 MIN-Tube-Lite Project</span>
+      <span aria-hidden="true"> · </span>
       <span>Select an application to launch.</span>
     </footer>
-
   </div>
 
   <script>
-    // ── Typewriter ──
-    (function () {
-      const phrases = [
-        "Welcome to the Next Generation. ✨",
-        "動画を、もっと快適に、自由に。🎬",
-        "プロキシ・AI・ツールを統合管理。🌐",
-        "最高の体験を、あなたに提供します。💎"
-      ];
-      const el = document.getElementById('typewriter');
-      let pIdx = 0, cIdx = 0, isDeleting = false;
-      function type() {
-        const current = phrases[pIdx];
-        el.textContent = current.substring(0, isDeleting ? --cIdx : ++cIdx);
-        let speed = isDeleting ? 35 : 70;
-        if (!isDeleting && cIdx === current.length) { speed = 2200; isDeleting = true; }
-        else if (isDeleting && cIdx === 0) { isDeleting = false; pIdx = (pIdx + 1) % phrases.length; speed = 400; }
-        setTimeout(type, speed);
-      }
-      type();
-    })();
-
     // ── Clock ──
     (function () {
       const el = document.getElementById('clock');
@@ -758,55 +398,56 @@
       if (el) el.textContent = cards.length;
     })();
 
-    // ── Search + status filter ──
+    // ── Filters: search + category + status ──
     (function () {
       const input = document.getElementById('appSearch');
-      const chips = document.querySelectorAll('.chip[data-filter]');
-      const sections = document.querySelectorAll('.category-section');
+      const catChips = document.querySelectorAll('.cat-chip');
+      const stChips = document.querySelectorAll('.st-chip');
+      const cards = Array.from(document.querySelectorAll('#appGrid .card'));
       const empty = document.getElementById('emptyState');
-      let status = 'all';
+      let cat = 'all', st = 'all';
 
       function apply() {
         const q = (input.value || '').trim().toLowerCase();
         let visible = 0;
-        sections.forEach(sec => {
-          let count = 0, total = 0;
-          sec.querySelectorAll('.card[data-endpoint]').forEach(card => {
-            total++;
-            const hay = ((card.getAttribute('data-name') || '') + ' ' +
-                         card.textContent + ' ' +
-                         (card.getAttribute('data-endpoint') || '')).toLowerCase();
-            const okQ = !q || hay.includes(q);
-            const okS = status === 'all' || card.getAttribute('data-status') === status;
-            const show = okQ && okS;
-            card.classList.toggle('hidden', !show);
-            if (show) { count++; visible++; }
-          });
-          sec.style.display = count ? '' : 'none';
-          const cnt = sec.querySelector('.cat-count');
-          if (cnt) cnt.textContent = count + (count === 1 ? ' App' : ' Apps') + (q || status !== 'all' ? ' / ' + total : '');
+        cards.forEach(card => {
+          const hay = ((card.getAttribute('data-name') || '') + ' ' +
+                       card.textContent + ' ' +
+                       (card.getAttribute('data-endpoint') || '')).toLowerCase();
+          const okQ = !q || hay.includes(q);
+          const okC = cat === 'all' || card.getAttribute('data-category') === cat;
+          const okS = st === 'all' || card.getAttribute('data-status') === st;
+          const show = okQ && okC && okS;
+          card.classList.toggle('hidden', !show);
+          if (show) visible++;
         });
         empty.hidden = visible !== 0;
       }
 
       input.addEventListener('input', apply);
-      chips.forEach(chip => {
+      catChips.forEach(chip => {
         chip.addEventListener('click', () => {
-          status = chip.getAttribute('data-filter');
-          chips.forEach(c => c.setAttribute('aria-pressed', String(c === chip)));
+          cat = chip.getAttribute('data-cat');
+          catChips.forEach(c => c.setAttribute('aria-pressed', String(c === chip)));
+          apply();
+        });
+      });
+      stChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          st = chip.getAttribute('data-st');
+          stChips.forEach(c => c.setAttribute('aria-pressed', String(c === chip)));
           apply();
         });
       });
     })();
 
-    // ── Card interactions (navigate) ──
+    // ── Card navigation ──
     document.querySelectorAll('.card').forEach(card => {
       const run = () => {
         const url = card.getAttribute('data-endpoint');
         if (!url) return;
-        card.style.transform = "translateY(-2px) scale(0.985)";
-        card.style.opacity = "0.75";
-        setTimeout(() => { window.location.href = url; }, 140);
+        card.style.opacity = '0.6';
+        setTimeout(() => { window.location.href = url; }, 120);
       };
       card.addEventListener('click', run);
       card.addEventListener('keydown', e => {

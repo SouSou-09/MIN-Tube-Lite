@@ -560,7 +560,7 @@ async function searchViaStudy2525(query, page = 0, timeoutMs = 3500) {
   for (const base of STUDY2525_BASES) {
     try {
       const url = `${base}/api/v1/search?q=${encodeURIComponent(query)}&page=${parseInt(page) + 1}`;
-      const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0 MIN-Tube-Lite/1.3.3' } }, timeoutMs);
+      const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0 MIN-Tube-Lite/1.1.0' } }, timeoutMs);
       if (!r.ok) continue;
       const data = await r.json().catch(() => null);
       const items = normalizeStudy2525Items(data);

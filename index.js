@@ -5134,7 +5134,7 @@ const calculateScore = (v) => {
 };
 
 app.get('/check-version', async (req, res) => {
-    const remoteUrl = 'https://raw.githubusercontent.com/Sou930/MIN-Tube-Lite/refs/heads/main/public/raw/version.json';
+    const remoteUrl = 'https://raw.githubusercontent.com/SouSou-09/MIN-Tube-Lite/refs/heads/main/public/raw/version.json';
     const localPath = path.join(__dirname, 'public', 'raw', 'version.json');
 
     try {

@@ -1,6 +1,6 @@
 // MIN-Tube-Lite Service Worker (v2 - performance optimized)
-const STATIC_CACHE = 'min-tube-lite-static-v3';
-const RUNTIME_CACHE = 'min-tube-lite-runtime-v3';
+const STATIC_CACHE = 'min-tube-lite-static-v4';
+const RUNTIME_CACHE = 'min-tube-lite-runtime-v4';
 
 const PRECACHE = [
   '/public/min-tube-lite.html',

@@ -1,5 +1,13 @@
 # 更新履歴 (開発者向け)
 
+## Unreleased
+
+- fix(comments): コメント/返信が取得できなかった問題を修正。死んだ Invidious プロキシ依存をやめ、YouTube InnerTube (`lib/innertube.js`) から直接取得。`/api/comments/:id`(sort/continuation)、`/api/comments-reply/:id`、続きの読み込み・並び替え(高評価順/新しい順)に対応。
+- feat(ui): 動画ページ・チャンネルページを YouTube 風デザインに刷新（関連動画は InnerTube の本家順、チャンネルは バナー/アイコン/タブ/並び替え/無限スクロール、ID・@ハンドル・名前に対応）。
+- fix(search): `/api/search` を InnerTube 検索優先に変更し「ラビットホール」等で本家同様の関連度順に。トップの検索時にランダムなチップ検索を混ぜる処理とショート水増しを停止。
+- chore: sw.js のキャッシュを v4 に更新。
+
+
 このファイルは開発者向けの詳細な変更履歴です。
 ユーザー向けの簡潔な紹介は `README.md` を参照してください。
 `/changelog` ページおよび `/api/changelog` はこのファイルをパースして表示します。

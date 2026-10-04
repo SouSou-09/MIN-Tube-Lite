@@ -2002,7 +2002,8 @@ if (!currentUrl.includes("projects") && !currentUrl.includes("private") && !curr
 
         if (page === 0) {
           const MIN_ITEMS = 12;
-          if (items.length < MIN_ITEMS) {
+          // 明示的な検索では無関係な動画を混ぜない (ホーム/急上昇のときだけ補完する)
+          if (items.length < MIN_ITEMS && (query === 'trending' || !new URLSearchParams(location.search).get('q'))) {
             const chips = Array.from(document.querySelectorAll('.chip'))
               .map(c => c.dataset.q).filter(q => q && q !== query);
             shuffleArray(chips);
@@ -2047,7 +2048,7 @@ if (!currentUrl.includes("projects") && !currentUrl.includes("private") && !curr
         });
 
         if (page === 0) {
-          if (currentQuery !== 'trending' && shorts.length > 0 && shorts.length <= 4) {
+          if (false && currentQuery !== 'trending' && shorts.length > 0 && shorts.length <= 4) { // 追加ページからのショート水増しは関連度を下げるため無効化
             const needed = 6;
             const addedShortIds = new Set(shorts.map(s => s.id));
             for (let p = 1; p <= 3 && shorts.length < needed; p++) {

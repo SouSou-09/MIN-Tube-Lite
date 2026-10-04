@@ -6,6 +6,7 @@ const cookieParser = require("cookie-parser");
 const https = require("https");
 const fs = require('fs');
 const compression = require("compression");
+const innertube = require("./lib/innertube");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -605,6 +606,20 @@ app.get("/api/search", async (req, res, next) => {
     return res.json(cached);
   }
   cacheStats.miss++;
+
+  // === 第一候補: YouTube InnerTube 検索 (本家と同じ関連度順) ===
+  try {
+    const r = await innertube.search(query, page);
+    const good = (r.items || []).filter(it => it && it.title);
+    if (good.length >= 3) {
+      const payload = { items: good, nextPage: r.nextPage };
+      res.setHeader('X-Cache', 'MISS');
+      res.setHeader('X-Source', 'innertube');
+      res.setHeader('Cache-Control', 'public, max-age=60');
+      await cacheSet(cacheKey, payload, 5 * 60 * 1000);
+      return res.json(payload);
+    }
+  } catch (e) { /* フォールバックへ */ }
 
   try {
     // === 並列リクエスト ===
@@ -1630,58 +1645,47 @@ let successfulApi = null;
 const protocol = req.headers['x-forwarded-proto'] || 'http';
 const host = req.headers.host;
 
-for (const apiBase of apiListCache) {
-  try {
-    videoData = await Promise.any([
+// InnerTube から動画ページ情報 (チャンネルID・登録者数・関連動画など) を並行取得
+const watchInfoPromise = Promise.race([
+  innertube.getWatchInfo(videoId).catch(() => null),
+  new Promise(r => setTimeout(() => r(null), 6000))
+]);
+
+const localFetch = (p) => fetchWithTimeout(`${protocol}://${host}${p}`, {}, 6000)
+  .then(r => r.ok ? r.json() : Promise.reject())
+  .then(d => d.stream_url ? d : Promise.reject());
+
+// ストリーム取得: ローカルのリゾルバ + 外部 API (生きているものだけ) を並列で競わせる
+try {
+  const racers = [localFetch(`/sia-dl/${videoId}`), localFetch(`/ai-fetch/${videoId}`)];
+  for (const apiBase of apiListCache.slice(0, 3)) {
+    racers.push(
       fetchWithTimeout(`${apiBase}/api/video/${videoId}`, {}, 5000)
-        .then(res => res.ok ? res.json() : Promise.reject())
-        .then(data => data.stream_url ? data : Promise.reject()),
-      fetchWithTimeout(`${protocol}://${host}/sia-dl/${videoId}`, {}, 5000)
-        .then(res => res.ok ? res.json() : Promise.reject())
-        .then(data => data.stream_url ? data : Promise.reject()),
-
-      // 読み込み高速化のため、ai-fetch も遅延なしで並行リクエスト（一番速い応答を採用）
-      fetchWithTimeout(`${protocol}://${host}/ai-fetch/${videoId}`, {}, 5000)
-        .then(res => res.ok ? res.json() : Promise.reject())
-        .then(data => data.stream_url ? data : Promise.reject())
-    ]);
-
-
-    try {
-      const cRes = await fetchWithTimeout(`${apiBase}/api/comments/${videoId}`, {}, 3000);
-      if (cRes.ok) commentsData = sanitizeComments(await cRes.json());
-    } catch (e) {}
-
-    successfulApi = apiBase;
-    break;
-
-  } catch (e) {
-    try {
-      const rapidRes = await fetchWithTimeout(`${protocol}://${host}/rapid/${videoId}`, {}, 5000);
-      if (rapidRes.ok) {
-        const rapidData = await rapidRes.json();
-        if (rapidData.stream_url) {
-          videoData = rapidData;
-          
-          try {
-            const cRes = await fetchWithTimeout(`${apiBase}/api/comments/${videoId}`, {}, 3000);
-            if (cRes.ok) commentsData = sanitizeComments(await cRes.json());
-          } catch (e) {}
-
-          successfulApi = apiBase; 
-          break; 
-        }
-      }
-    } catch (rapidErr) {}
-    continue;
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(d => d.stream_url ? d : Promise.reject())
+    );
   }
+  videoData = await Promise.any(racers);
+} catch (e) {
+  try { videoData = await localFetch(`/rapid/${videoId}`); } catch (e2) {}
 }
+
+const watchInfo = await watchInfoPromise;
 
 if (!videoData) {
   videoData = { videoTitle: "再生できない動画", stream_url: "youtube-nocookie" };
 }
 
 commentsData = sanitizeComments(commentsData);
+if (watchInfo) {
+  if (!videoData.videoTitle || videoData.videoTitle === "再生できない動画") videoData.videoTitle = watchInfo.title || videoData.videoTitle;
+  if (watchInfo.channelName && !videoData.channelName) videoData.channelName = watchInfo.channelName;
+  if (watchInfo.channelId) videoData.channelId = watchInfo.channelId;
+  if (watchInfo.channelImage && (!videoData.channelImage || /ui-avatars\.com/.test(videoData.channelImage))) videoData.channelImage = watchInfo.channelImage;
+  if (!videoData.videoDes && watchInfo.description) videoData.videoDes = watchInfo.description;
+}
+videoData.videoTitle = videoData.videoTitle || '';
+videoData.channelName = videoData.channelName || '';
 let isShortForm = videoData.videoTitle.includes('#');
 
 if (isShortForm) {
@@ -1796,7 +1800,7 @@ const shortsHtml = `
             <div class="side-bar">
                 <div class="action-btn"><div class="btn-icon"><i class="fas fa-thumbs-up"></i></div><span>${videoData.likeCount || '評価'}</span></div>
                 <div class="action-btn"><div class="btn-icon"><i class="fas fa-thumbs-down"></i></div><span>低評価</span></div>
-                <div class="action-btn" onclick="toggleComments()"><div class="btn-icon"><i class="fas fa-comment-dots"></i></div><span>${commentsData.commentCount || 0}</span></div>
+                <div class="action-btn" onclick="toggleComments()"><div class="btn-icon"><i class="fas fa-comment-dots"></i></div><span>コメント</span></div>
                 <div class="action-btn"><div class="btn-icon"><i class="fas fa-share"></i></div><span>共有</span></div>
                 <div class="action-btn"><div class="btn-icon" style="background:none;"><img src="${videoData.channelImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(videoData.channelName||'C')}&background=random&color=fff&size=64&bold=true`}" style="width:30px; height:30px; border-radius:4px; border:2px solid #fff;" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(videoData.channelName||'C')}&background=555&color=fff&size=64&bold=true'"></div></div>
             </div>
@@ -1806,7 +1810,7 @@ const shortsHtml = `
             </div>
             <div id="commentsPanel" class="comments-panel">
                 <div class="comments-header">
-                    <h3>コメント<span class="count" id="shortsCommentCount">${commentsData.commentCount || 0}</span></h3>
+                    <h3>コメント<span class="count" id="shortsCommentCount"></span></h3>
                     <i class="fas fa-times" style="cursor:pointer; font-size:18px; padding:4px;" onclick="toggleComments()"></i>
                 </div>
                 <div class="comments-body" id="shortsCommentsBody"></div>
@@ -1891,7 +1895,7 @@ const shortsHtml = `
         };
 
         /* ===== コメントレンダリング (Shorts) ===== */
-        const __SHORTS_COMMENTS_DATA = ${safeJson(commentsData || { commentCount: 0, comments: [] })};
+        const __SHORTS_COMMENTS_DATA = { commentCount: 0, comments: [] };
         const __SHORTS_VIDEO_ID = ${safeJson(videoId)};
         let __shortsCommentsRendered = false;
 
@@ -1953,7 +1957,7 @@ const shortsHtml = `
             const avatar = shortsAvatar(c, isReply ? 22 : 32);
             const authorCls = c.authorIsChannelOwner ? 'comment-author is-creator' : 'comment-author';
             const time = shortsRelativeTime(c);
-            const likes = shortsFormatLike(c.likeCount);
+            const likes = c.likeCountText || shortsFormatLike(c.likeCount);
             const replyCount = (c.replies && (c.replies.replyCount || c.replies.commentCount)) || 0;
             const continuation = c.replies && c.replies.continuation;
             const commentId = c.commentId || c.id || (Math.random().toString(36).slice(2));
@@ -1992,26 +1996,41 @@ const shortsHtml = `
             h += '</div></div>';
             return h;
         }
+        let __shortsCont = '', __shortsDone = false, __shortsLoading = false;
+        async function shortsLoadComments(first) {
+            if (__shortsLoading || __shortsDone) return;
+            __shortsLoading = true;
+            const body = document.getElementById('shortsCommentsBody');
+            const old = body.querySelector('.shorts-more'); if (old) old.remove();
+            if (first) body.innerHTML = '<div class="reply-loading"><div class="mini-spinner"></div>読み込み中...</div>';
+            let data = null;
+            for (let i = 0; i < 2 && !data; i++) {
+                try {
+                    const r = await fetch('/api/comments/' + __SHORTS_VIDEO_ID + (__shortsCont ? '?continuation=' + encodeURIComponent(__shortsCont) : ''));
+                    const j = await r.json();
+                    if (r.ok && Array.isArray(j.comments)) data = j;
+                } catch (e) {}
+            }
+            __shortsLoading = false;
+            if (first) body.innerHTML = '';
+            if (!data) { body.insertAdjacentHTML('beforeend', '<div class="comments-empty" style="color:#ff6b6b">コメントを取得できませんでした</div>'); __shortsCommentsRendered = false; return; }
+            if (data.disabled || (first && data.comments.length === 0)) {
+                body.innerHTML = '<div class="comments-empty"><i class="far fa-comment"></i>' + (data.disabled ? 'コメントは無効になっています' : 'コメントはまだありません') + '</div>';
+                __shortsDone = true; return;
+            }
+            body.insertAdjacentHTML('beforeend', data.comments.map(c => shortsRenderComment(c, false)).join(''));
+            __shortsCont = data.continuation || '';
+            __shortsDone = !__shortsCont;
+            const cntEl = document.getElementById('shortsCommentCount');
+            if (cntEl && data.commentCount) cntEl.textContent = data.commentCount;
+            if (!__shortsDone) {
+                body.insertAdjacentHTML('beforeend', '<button class="replies-toggle shorts-more" style="margin:8px auto;display:block" onclick="shortsLoadComments(false)">さらにコメントを表示</button>');
+            }
+        }
         function shortsRenderComments() {
             if (__shortsCommentsRendered) return;
             __shortsCommentsRendered = true;
-            const body = document.getElementById('shortsCommentsBody');
-            if (!body) return;
-            const data = __SHORTS_COMMENTS_DATA;
-            if (!data.comments || data.comments.length === 0) {
-                body.innerHTML = '<div class="comments-empty"><i class="far fa-comment"></i>コメントはまだありません</div>';
-                return;
-            }
-            const sorted = data.comments.slice().sort((a,b) => {
-                if (!!b.isPinned !== !!a.isPinned) return b.isPinned ? 1 : -1;
-                return (b.likeCount || 0) - (a.likeCount || 0);
-            });
-            body.innerHTML = sorted.map(c => shortsRenderComment(c, false)).join('');
-            const cntEl = document.getElementById('shortsCommentCount');
-            if (cntEl) {
-                const cnt = data.commentCount || data.comments.length;
-                cntEl.textContent = (typeof cnt === 'number') ? cnt.toLocaleString() : cnt;
-            }
+            shortsLoadComments(true);
         }
         function shortsToggleLike(btn, isDown) {
             const icon = btn.querySelector('i');
@@ -2052,6 +2071,20 @@ const shortsHtml = `
                 const replies = data.comments || [];
                 if (replies.length === 0) container.innerHTML = '<div class="reply-loading">返信はありません</div>';
                 else container.innerHTML = replies.map(r => shortsRenderComment(r, true)).join('');
+                if (data.continuation) {
+                    const mb = document.createElement('button');
+                    mb.className = 'replies-toggle'; mb.textContent = 'さらに返信を表示';
+                    mb.onclick = async () => {
+                        mb.disabled = true;
+                        try {
+                            const r2 = await fetch('/api/comments-reply/' + __SHORTS_VIDEO_ID + '?continuation=' + encodeURIComponent(data.continuation));
+                            const d2 = await r2.json();
+                            mb.insertAdjacentHTML('beforebegin', (d2.comments || []).map(x => shortsRenderComment(x, true)).join(''));
+                            if (d2.continuation) { data.continuation = d2.continuation; mb.disabled = false; } else mb.remove();
+                        } catch (e) { mb.disabled = false; }
+                    };
+                    container.appendChild(mb);
+                }
             } catch (e) {
                 container.innerHTML = '<div class="reply-loading" style="color:#ff6b6b;">読み込み失敗</div>';
             }
@@ -2115,19 +2148,28 @@ const shortsHtml = `
     // playerWrapper は空にして、クライアント側JSが localStorage.playbackMode に基づいて初期化する
 const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#000;"><div class="spinner"></div></div>`;
 
+    const escH = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const wi = watchInfo || {};
+    const channelHref = '/channel/' + encodeURIComponent(videoData.channelId || wi.channelId || videoData.channelName || '');
+    const ownerAvatar = videoData.channelImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(videoData.channelName || 'C')}&background=random&color=fff&size=80&bold=true`;
+    const descViews = wi.viewCountText || (videoData.videoViews ? Number(videoData.videoViews).toLocaleString('ja-JP') + ' 回視聴' : '');
+    const descDate = wi.dateText || '';
+    const descHtml = escH(videoData.videoDes || '')
+      .replace(/(https?:\/\/[^\s<&]+(?:&amp;[^\s<&]+)*)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
+      .replace(/\r\n|\n|\r/g, '<br>');
     const html = `
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${videoData.videoTitle} - YouTube Pro</title>
+    <title>${escH(videoData.videoTitle)} - YouTube Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
         /* テーマ適用(チラつき防止のため描画前に実行) — ホームと同じ 'theme' キーを共有 */
         (function() {
             try {
-                if (localStorage.getItem('theme') === 'light') {
+                if (localStorage.getItem('theme') !== 'dark') {
                     document.documentElement.classList.add('light-mode');
                 }
             } catch (e) {}
@@ -2373,9 +2415,10 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
         .pl-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
         .pl-toast i { color: var(--brand); }
     </style>
+    <link rel="stylesheet" href="/css/yt-watch.css?v=1">
 </head>
 <body>
-<script>(function(){try{if(localStorage.getItem('theme')==='light'){document.body.classList.add('light-mode');}}catch(e){}})();</script>
+<script>(function(){try{if(localStorage.getItem('theme')!=='dark'){document.body.classList.add('light-mode');}}catch(e){}})();</script>
 <nav class="navbar">
     <div class="nav-left"><a href="/" class="logo"><i class="fab fa-youtube"></i>YouTube Pro</a></div>
     <div class="nav-center">
@@ -2399,18 +2442,41 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
                 <div style="font-weight: bold; font-size: 16px;">動画サーバーに接続中...</div>
             </div>
         </div>
-        <h1 class="video-title">${videoData.videoTitle}</h1>
-        <div id="hashtagBar" class="hashtag-bar"></div>
+        <h1 class="video-title">${escH(videoData.videoTitle)}</h1>
         <div class="owner-row">
             <div class="owner-info">
-                <a href="/channel/${encodeURIComponent(videoData.channelName)}" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;">
-                  <img id="ownerAvatar" src="${videoData.channelImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(videoData.channelName||'C')}&background=random&color=fff&size=80&bold=true`}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(videoData.channelName||'C')}&background=555&color=fff&size=80&bold=true'">
-                  <div class="channel-name">${videoData.channelName}</div>
+                <a href="${channelHref}" class="owner-avatar-link">
+                  <img id="ownerAvatar" src="${escH(ownerAvatar)}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(videoData.channelName||'C')}&background=555&color=fff&size=80&bold=true'">
                 </a>
+                <div class="owner-text">
+                  <a href="${channelHref}" class="channel-name">${escH(videoData.channelName)}${wi.verified ? ' <i class="fas fa-check-circle verified-badge" title="認証済み"></i>' : ''}</a>
+                  <div class="owner-subs" id="ownerSubs">${escH((wi.subscriberText || '').replace(/^チャンネル登録者数\s*/, '登録者 '))}</div>
+                </div>
                 <button id="subBtn" class="btn-sub" onclick="toggleSubscribeVideo()">チャンネル登録</button>
+            </div>
+            <div class="action-toolbar">
+                <div class="yt-pill-group">
+                    <button class="yt-pill-btn" id="likeBtn" onclick="toggleVideoLike()" title="高く評価"><i class="far fa-thumbs-up"></i><span id="likeLabel">${escH(wi.likeCountText || (videoData.likeCount ? Number(videoData.likeCount).toLocaleString('ja-JP') : '高評価'))}</span></button>
+                    <span class="yt-pill-sep"></span>
+                    <button class="yt-pill-btn" id="dislikeBtn" onclick="toggleVideoDislike()" title="低く評価"><i class="far fa-thumbs-down"></i></button>
+                </div>
+                <button class="action-btn" onclick="shareVideo()"><i class="fas fa-share"></i> 共有</button>
+                <button class="action-btn" id="savePlBtn" onclick="openPlaylistModal()" title="再生リストに保存"><i class="far fa-bookmark"></i> 保存</button>
+                <div class="download-menu-wrap">
+                    <button class="action-btn" id="downloadBtn" onclick="toggleDownloadMenu(event)" title="ダウンロード"><i class="fas fa-download"></i> ダウンロード</button>
+                    <div class="download-menu" id="downloadMenu">
+                        <div class="dm-header">ダウンロードリンク</div>
+                        <div id="downloadMenuList"><div class="dm-empty">取得中...</div></div>
+                    </div>
+                </div>
+                <button class="action-btn" id="theaterBtn" onclick="toggleTheaterMode()" title="シアターモード (T)"><i class="fas fa-tv"></i> シアター</button>
+                <div id="autoplayPill" class="autoplay-pill" onclick="toggleAutoplay()" title="動画終了時に自動で次の動画を再生します">
+                    <span>自動再生</span>
+                    <span class="autoplay-switch"></span>
+                </div>
                 <div class="server-dropdown-container">
                     <button class="btn-server" onclick="toggleServerMenu()">
-                        <i class="fas fa-server"></i> 動画サーバー <i class="fas fa-chevron-down" style="font-size: 12px; margin-left: 2px;"></i>
+                        <i class="fas fa-server"></i> 動画サーバー <i class="fas fa-chevron-down" style="font-size: 11px;"></i>
                     </button>
                     <div id="serverMenu" class="server-menu">
                         <div class="server-option active" onclick="changeServer('googlevideo', '', event)">Googlevideo</div>
@@ -2421,23 +2487,6 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
                         <div class="server-option" onclick="changeServer('Youtube-Pro', '/pro-stream/${videoId}', event)">Youtube-Pro</div>
                     </div>
                 </div>
-            </div>
-            <div class="action-toolbar">
-                <div id="autoplayPill" class="autoplay-pill" onclick="toggleAutoplay()" title="動画終了時に自動で次の動画を再生します">
-                    <span>自動再生</span>
-                    <span class="autoplay-switch"></span>
-                </div>
-                <button class="action-btn" id="theaterBtn" onclick="toggleTheaterMode()" title="シアターモード (T)"><i class="fas fa-tv"></i> シアター</button>
-                <div class="download-menu-wrap">
-                    <button class="action-btn" id="downloadBtn" onclick="toggleDownloadMenu(event)" title="ダウンロード"><i class="fas fa-download"></i> 保存</button>
-                    <div class="download-menu" id="downloadMenu">
-                        <div class="dm-header">ダウンロードリンク</div>
-                        <div id="downloadMenuList"><div class="dm-empty">取得中...</div></div>
-                    </div>
-                </div>
-                <button class="action-btn" id="savePlBtn" onclick="openPlaylistModal()" title="再生リストに保存"><i class="fas fa-bookmark"></i> 保存</button>
-                <button class="action-btn">👍 ${videoData.likeCount || 0}</button>
-                <button class="action-btn" onclick="shareVideo()"><i class="fas fa-share"></i> 共有</button>
             </div>
         </div>
         <div id="nextUpOverlay" class="next-up-overlay" aria-live="polite">
@@ -2450,34 +2499,42 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
             </div>
         </div>
         <div class="description-box" id="descriptionBox" onclick="toggleDescription(event)">
-            <b>${videoData.videoViews || '0'} 回視聴</b>
-            <div class="description-content" id="descriptionContent">
-                ${(videoData.videoDes || '').replace(/\r\n|\n|\r/g, '<br>')}
-            </div>
-            <div class="description-show-more" id="descriptionToggleBtn">全文を表示</div>
+            <div class="desc-stats"><b>${escH(descViews)}</b>${descDate ? ' <b class="desc-date">' + escH(descDate) + '</b>' : ''}</div>
+            <div id="hashtagBar" class="hashtag-bar"></div>
+            <div class="description-content" id="descriptionContent">${descHtml}</div>
+            <div class="description-show-more" id="descriptionToggleBtn">...もっと見る</div>
         </div>
         <div class="comments-section">
-            <h3>
-                <span>コメント <span id="commentCountLabel">${commentsData.commentCount || 0}</span> 件</span>
-            </h3>
-            <div class="comments-toolbar">
-                <div class="comments-sort" id="commentsSortBtn" onclick="toggleCommentSort()">
-                    <i class="fas fa-sort"></i>
-                    <span id="commentsSortLabel">人気順</span>
+            <div class="comments-head">
+                <h3><span id="commentCountLabel">${escH(commentsData.commentCount || '')}</span><span class="comments-head-suffix"> 件のコメント</span></h3>
+                <div class="sort-wrap">
+                    <div class="comments-sort" id="commentsSortBtn" onclick="toggleSortMenu(event)">
+                        <i class="fas fa-sort-amount-down"></i>
+                        <span id="commentsSortLabel">高評価順</span>
+                    </div>
+                    <div class="sort-menu" id="sortMenu">
+                        <div class="sort-opt active" data-sort="top" onclick="setCommentSort('top')">高評価順</div>
+                        <div class="sort-opt" data-sort="new" onclick="setCommentSort('new')">新しい順</div>
+                    </div>
                 </div>
             </div>
-            <div id="commentsList" class="comments-list"></div>
+            <div id="commentsList" class="comments-list"><div class="reply-loading" style="padding:24px 0"><div class="mini-spinner"></div>コメントを読み込み中...</div></div>
+            <div id="commentsMore" class="comments-more" style="display:none"></div>
         </div>
     </div>
     <div class="sidebar">
-        <div id="recommendations"></div>
+        <div class="rec-chips" id="recChips">
+            <button class="rec-chip active" data-f="all" onclick="setRecFilter('all')">すべて</button>
+            <button class="rec-chip" data-f="channel" onclick="setRecFilter('channel')">${escH(videoData.channelName || '投稿者')} の動画</button>
+        </div>
+        <div id="recommendations"><div class="reply-loading" style="padding:16px 0"><div class="mini-spinner"></div>読み込み中...</div></div>
         <div id="shortsShelf" class="shorts-shelf-container" style="display:none;">
             <div class="shorts-shelf-title">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="red">
                     <path d="M17.77,10.32l-1.2-.5L18,9.06a3.74,3.74,0,0,0-3.5-6.62L6,6.94a3.74,3.74,0,0,0,.23,6.74l1.2.49L6,14.93a3.75,3.75,0,0,0,3.5,6.63l8.5-4.5a3.74,3.74,0,0,0-.23-6.74Z"/>
                     <polygon points="10 14.65 15 12 10 9.35 10 14.65" fill="#fff"/>
                 </svg>
-                Shorts
+                ショート
             </div>
             <div id="shortsGrid" class="shorts-grid"></div>
         </div>
@@ -2503,6 +2560,8 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
 </div>
 <div id="plToast" class="pl-toast"></div>
 
+<script>window.__WATCH = { videoId: ${safeJson(videoId)}, channel: ${safeJson(videoData.channelName || '')}, title: ${safeJson(videoData.videoTitle || '')} };</script>
+<script src="/js/yt-watch.js?v=2"></script>
 <script>
     function toggleServerMenu() { document.getElementById('serverMenu').classList.toggle('show'); }
     window.addEventListener('click', function(e) { if (!e.target.closest('.server-dropdown-container')) { const menu = document.getElementById('serverMenu'); if (menu && menu.classList.contains('show')) menu.classList.remove('show'); } });
@@ -2514,12 +2573,10 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
       const isSub = localStorage.getItem(SUB_KEY_VIDEO) === 'true';
       if (isSub) {
         subBtn.textContent = '登録済み';
-        subBtn.style.background = '#272727';
-        subBtn.style.color = '#aaa';
+        subBtn.classList.add('subscribed');
       } else {
         subBtn.textContent = 'チャンネル登録';
-        subBtn.style.background = 'white';
-        subBtn.style.color = 'black';
+        subBtn.classList.remove('subscribed');
       }
     }
     function toggleSubscribeVideo() {
@@ -2608,260 +2665,21 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
         } catch (error) { console.error(error); } finally { overlay.classList.remove('active'); }
     }
 
-    /* ======================================================
-     * コメントレンダリング
-     * ====================================================== */
-    const __COMMENTS_DATA = ${safeJson(commentsData || { commentCount: 0, comments: [] })};
-    const __VIDEO_ID_FOR_COMMENTS = ${safeJson(videoId)};
-    let __commentSortMode = 'top'; // 'top' or 'new'
-
-    function escapeHtml(str) {
-        if (str == null) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-    function linkifyText(text) {
-        // 改行は white-space:pre-wrap で表現するので、URLだけリンク化
-        const escaped = escapeHtml(text);
-        return escaped.replace(/(https?:\\/\\/[^\\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#3ea6ff;">$1</a>');
-    }
-    function formatRelativeTime(c) {
-        // Invidious 系: published(秒) と publishedText("3 days ago" など)
-        // 既に publishedText があればそれを優先して日本語化
-        const text = c.publishedText || c.published_text || '';
-        if (text) {
-            // 英語表現を日本語に変換
-            const map = [
-                [/^(\\d+)\\s*seconds?\\s*ago/i, '$1秒前'],
-                [/^(\\d+)\\s*minutes?\\s*ago/i, '$1分前'],
-                [/^(\\d+)\\s*hours?\\s*ago/i, '$1時間前'],
-                [/^(\\d+)\\s*days?\\s*ago/i, '$1日前'],
-                [/^(\\d+)\\s*weeks?\\s*ago/i, '$1週間前'],
-                [/^(\\d+)\\s*months?\\s*ago/i, '$1か月前'],
-                [/^(\\d+)\\s*years?\\s*ago/i, '$1年前'],
-                [/\\(edited\\)/i, '(編集済み)'],
-            ];
-            let out = text;
-            for (const [re, rep] of map) out = out.replace(re, rep);
-            return out;
-        }
-        // published (unix秒) から計算
-        const ts = c.published || c.publishedTime || c.publishedTimeText;
-        if (typeof ts === 'number') {
-            const diff = Math.floor(Date.now() / 1000) - ts;
-            if (diff < 60) return diff + '秒前';
-            if (diff < 3600) return Math.floor(diff / 60) + '分前';
-            if (diff < 86400) return Math.floor(diff / 3600) + '時間前';
-            if (diff < 86400 * 7) return Math.floor(diff / 86400) + '日前';
-            if (diff < 86400 * 30) return Math.floor(diff / (86400 * 7)) + '週間前';
-            if (diff < 86400 * 365) return Math.floor(diff / (86400 * 30)) + 'か月前';
-            return Math.floor(diff / (86400 * 365)) + '年前';
-        }
-        return '';
-    }
-    function formatLikeCount(n) {
-        if (n == null || n === 0 || isNaN(n)) return '';
-        if (n < 1000) return String(n);
-        if (n < 10000) return (n / 1000).toFixed(1).replace(/\\.0$/, '') + '千';
-        if (n < 100000000) return (n / 10000).toFixed(1).replace(/\\.0$/, '') + '万';
-        return (n / 100000000).toFixed(1).replace(/\\.0$/, '') + '億';
-    }
-    function getAvatarUrl(c, size) {
-        size = size || 40;
-        const t = c && c.authorThumbnails;
-        if (Array.isArray(t) && t.length > 0) {
-            // 一番近いサイズを選ぶ
-            const sorted = t.slice().sort((a, b) => Math.abs((a.width || 0) - size) - Math.abs((b.width || 0) - size));
-            return sorted[0].url || '';
-        }
-        const name = (c && c.author) || 'U';
-        return 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=555&color=fff&size=' + (size * 2) + '&bold=true';
-    }
-    function renderCommentItem(c, isReply) {
-        const avatar = getAvatarUrl(c, isReply ? 24 : 40);
-        const authorClass = c.authorIsChannelOwner ? 'comment-author is-creator' : 'comment-author';
-        const time = formatRelativeTime(c);
-        const likes = formatLikeCount(c.likeCount);
-        const replyCount = (c.replies && (c.replies.replyCount || c.replies.commentCount)) || 0;
-        const continuation = c.replies && c.replies.continuation;
-        const commentId = c.commentId || c.id || (Math.random().toString(36).slice(2));
-        const isPinned = !!c.isPinned;
-        const creatorHeart = c.creatorHeart && (c.creatorHeart.creatorThumbnail || c.creatorHeart.creatorName);
-
-        let html = '';
-        if (isReply) {
-            html += '<div class="reply-item">';
-            html += '<img class="reply-avatar" src="' + escapeHtml(avatar) + '" loading="lazy" onerror="this.src=\\'https://ui-avatars.com/api/?name=U&background=555&color=fff&size=48\\'">';
-            html += '<div class="comment-body">';
-        } else {
-            html += '<div class="comment-item" data-comment-id="' + escapeHtml(commentId) + '">';
-            html += '<img class="comment-avatar" src="' + escapeHtml(avatar) + '" loading="lazy" onerror="this.src=\\'https://ui-avatars.com/api/?name=U&background=555&color=fff&size=80\\'">';
-            html += '<div class="comment-body">';
-            if (isPinned) {
-                html += '<div class="comment-pinned"><i class="fas fa-thumbtack"></i> 固定されたコメント</div>';
-            }
-        }
-        html += '<div class="comment-meta-row">';
-        html += '<span class="' + authorClass + '">' + escapeHtml(c.author || '匿名') + '</span>';
-        if (time) html += '<span class="comment-time">' + escapeHtml(time) + '</span>';
-        html += '</div>';
-        html += '<div class="comment-content">' + linkifyText(c.content || '') + '</div>';
-        html += '<div class="comment-actions">';
-        html += '<button class="comment-action-btn" onclick="toggleCommentLike(this)" title="高評価"><i class="far fa-thumbs-up"></i><span class="comment-likes">' + escapeHtml(likes) + '</span></button>';
-        html += '<button class="comment-action-btn" onclick="toggleCommentLike(this, true)" title="低評価"><i class="far fa-thumbs-down"></i></button>';
-        if (creatorHeart) {
-            const heartImg = c.creatorHeart.creatorThumbnail || '';
-            html += '<span class="comment-action-btn" title="' + escapeHtml((c.creatorHeart.creatorName || 'クリエイター') + 'のハート') + '"><i class="fas fa-heart" style="color:#ff0033;"></i></span>';
-        }
-        html += '</div>';
-        if (!isReply && replyCount > 0) {
-            html += '<button class="replies-toggle" onclick="toggleReplies(this, \\'' + escapeHtml(commentId) + '\\', ' + JSON.stringify(continuation || '') + ')">';
-            html += '<i class="fas fa-chevron-down"></i>';
-            html += '<span>返信 ' + replyCount + ' 件</span>';
-            html += '</button>';
-            html += '<div class="replies-container" data-loaded="0"></div>';
-        }
-        html += '</div></div>'; // close .comment-body, .comment-item/.reply-item
-        return html;
-    }
-    function renderComments() {
-        const list = document.getElementById('commentsList');
-        if (!list) return;
-        const data = __COMMENTS_DATA;
-        if (!data.comments || data.comments.length === 0) {
-            list.innerHTML = '<div class="comments-empty"><i class="far fa-comment" style="font-size:32px; margin-bottom:8px; display:block;"></i>コメントはまだありません</div>';
-            return;
-        }
-        // ソート
-        const sorted = data.comments.slice();
-        if (__commentSortMode === 'new') {
-            sorted.sort((a, b) => (b.published || 0) - (a.published || 0));
-        } else {
-            // top: ピン留め最優先、その後 likeCount 降順
-            sorted.sort((a, b) => {
-                if (!!b.isPinned !== !!a.isPinned) return b.isPinned ? 1 : -1;
-                return (b.likeCount || 0) - (a.likeCount || 0);
-            });
-        }
-        list.innerHTML = sorted.map(c => renderCommentItem(c, false)).join('');
-        const countLabel = document.getElementById('commentCountLabel');
-        if (countLabel) {
-            const cnt = data.commentCount || data.comments.length;
-            countLabel.textContent = (typeof cnt === 'number') ? cnt.toLocaleString() : cnt;
-        }
-    }
-    function toggleCommentSort() {
-        __commentSortMode = (__commentSortMode === 'top') ? 'new' : 'top';
-        const label = document.getElementById('commentsSortLabel');
-        if (label) label.textContent = (__commentSortMode === 'top') ? '人気順' : '新しい順';
-        renderComments();
-    }
-    function toggleCommentLike(btn, isDown) {
-        const icon = btn.querySelector('i');
-        const active = btn.classList.toggle('active');
-        if (icon) {
-            if (active) {
-                icon.classList.remove('far');
-                icon.classList.add('fas');
-            } else {
-                icon.classList.remove('fas');
-                icon.classList.add('far');
-            }
-        }
-        // 高評価カウント表示の更新（ローカルのみ）
-        if (!isDown) {
-            const span = btn.querySelector('.comment-likes');
-            if (span) {
-                const cur = span.textContent || '';
-                // 簡易: +1 表示
-                if (active && !cur.endsWith('+')) span.textContent = (cur || '0') + ' ❤';
-                else if (!active) span.textContent = cur.replace(/ ❤$/, '');
-            }
-        }
-    }
-    async function toggleReplies(btn, commentId, continuation) {
-        const container = btn.parentElement.querySelector('.replies-container');
-        if (!container) return;
-        const isOpen = container.classList.contains('open');
-        const label = btn.querySelector('span');
-        if (isOpen) {
-            container.classList.remove('open');
-            btn.classList.remove('open');
-            if (label) label.textContent = label.textContent.replace('返信を非表示', '返信を表示');
-            return;
-        }
-        container.classList.add('open');
-        btn.classList.add('open');
-        if (container.dataset.loaded === '1') return;
-        // 取得済みの replies が data に既にあるか確認
-        const myComment = (__COMMENTS_DATA.comments || []).find(x => (x.commentId || x.id) === commentId);
-        if (myComment && myComment.replies && Array.isArray(myComment.replies.replies) && myComment.replies.replies.length > 0) {
-            container.innerHTML = myComment.replies.replies.map(r => renderCommentItem(r, true)).join('');
-            container.dataset.loaded = '1';
-            return;
-        }
-        if (!continuation) {
-            container.innerHTML = '<div class="reply-loading">返信を取得できません</div>';
-            container.dataset.loaded = '1';
-            return;
-        }
-        container.innerHTML = '<div class="reply-loading"><div class="mini-spinner"></div>返信を読み込み中...</div>';
-        try {
-            const r = await fetch('/api/comments-reply/' + __VIDEO_ID_FOR_COMMENTS + '?continuation=' + encodeURIComponent(continuation));
-            if (!r.ok) throw new Error('failed');
-            const data = await r.json();
-            const replies = data.comments || [];
-            if (replies.length === 0) {
-                container.innerHTML = '<div class="reply-loading">返信はありません</div>';
-            } else {
-                container.innerHTML = replies.map(r => renderCommentItem(r, true)).join('');
-            }
-        } catch (e) {
-            container.innerHTML = '<div class="reply-loading" style="color:#ff6b6b;">返信の取得に失敗しました</div>';
-        }
-        container.dataset.loaded = '1';
-    }
-
-    // 次の動画を保存しておく（自動再生用）
+    /* コメント / 返信 / 関連動画は /js/yt-watch.js (InnerTube API 経由) が処理する */
     window.__nextVideo = null;
-    async function loadRecommendations() {
-        const params = new URLSearchParams({ title: "${videoData.videoTitle}", channel: "${videoData.channelName}", id: "${videoId}" });
-        const res = await fetch(\`/api/recommendations?\${params.toString()}\`);
-        const data = await res.json();
-        const shorts = data.items.filter(item => item.title.includes('#'));
-        const regulars = data.items.filter(item => !item.title.includes('#'));
-        // 「次の動画」として最初の通常動画を保存
-        if (regulars.length > 0) {
-            window.__nextVideo = regulars[0];
-        }
-        document.getElementById('recommendations').innerHTML = regulars.map(item => \`
-            <a href="/video/\${item.id}" class="rec-item">
-                <div class="rec-thumb"><img src="https://i.ytimg.com/vi/\${item.id}/mqdefault.jpg"></div>
-                <div class="rec-info">
-                    <div class="rec-title">\${item.title}</div>
-                    <div class="rec-meta">\${item.channelTitle}</div>
-                    <div class="rec-meta">\${item.viewCountText || ''}</div>
-                </div>
-            </a>
-        \`).join('');
-        if (shorts.length > 0) {
-            const shelf = document.getElementById('shortsShelf');
-            const grid = document.getElementById('shortsGrid');
-            shelf.style.display = 'block';
-            grid.innerHTML = shorts.slice(0, 4).map(item => \`
-                <a href="/video/\${item.id}" class="short-card">
-                    <div class="short-thumb"><img src="https://i.ytimg.com/vi/\${item.id}/hq720.jpg"></div>
-                    <div class="short-info">
-                        <div class="short-title">\${item.title}</div>
-                        <div class="short-views">\${item.viewCountText || ''}</div>
-                    </div>
-                </a>
-            \`).join('');
-        }
+
+    // 高評価 / 低評価 (ローカル表示のみ)
+    function toggleVideoLike() {
+        const b = document.getElementById('likeBtn'); const d = document.getElementById('dislikeBtn');
+        const on = b.classList.toggle('active');
+        b.querySelector('i').className = on ? 'fas fa-thumbs-up' : 'far fa-thumbs-up';
+        if (on) { d.classList.remove('active'); d.querySelector('i').className = 'far fa-thumbs-down'; }
+    }
+    function toggleVideoDislike() {
+        const b = document.getElementById('likeBtn'); const d = document.getElementById('dislikeBtn');
+        const on = d.classList.toggle('active');
+        d.querySelector('i').className = on ? 'fas fa-thumbs-down' : 'far fa-thumbs-down';
+        if (on) { b.classList.remove('active'); b.querySelector('i').className = 'far fa-thumbs-up'; }
     }
     window.onload = () => {
         loadRecommendations();
@@ -2936,7 +2754,7 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
         const btn = document.getElementById('descriptionToggleBtn');
         if (box.classList.contains('expanded')) {
             box.classList.remove('expanded');
-            btn.textContent = '全文を表示';
+            btn.textContent = '...もっと見る';
         } else {
             box.classList.add('expanded');
             btn.textContent = '一部を表示';
@@ -4312,27 +4130,78 @@ app.get("/api/suggest", async (req, res) => {
 });
 
 // コメント返信取得 (Invidious continuation 経由)
+// ── コメント (YouTube InnerTube 直接取得) ──
+// GET /api/comments/:videoId?sort=top|new&continuation=...
+app.get("/api/comments/:videoId", async (req, res) => {
+  const videoId = req.params.videoId;
+  if (!videoId || !/^[\w-]{6,20}$/.test(videoId)) {
+    return res.status(400).json({ error: "Invalid video id", comments: [] });
+  }
+  try {
+    const data = await innertube.getComments(videoId, {
+      sort: req.query.sort === 'new' ? 'new' : 'top',
+      continuation: req.query.continuation || ''
+    });
+    res.set("Cache-Control", "public, max-age=60");
+    return res.json(data);
+  } catch (err) {
+    return res.status(502).json({ error: "コメントを取得できませんでした", message: err.message, comments: [] });
+  }
+});
+
+// GET /api/comments-reply/:videoId?continuation=... (返信 / 返信の続き)
 app.get("/api/comments-reply/:videoId", async (req, res) => {
   const videoId = req.params.videoId;
   const continuation = req.query.continuation || '';
   if (!videoId || !/^[\w-]{6,20}$/.test(videoId)) {
-    return res.status(400).json({ error: "Invalid video id" });
+    return res.status(400).json({ error: "Invalid video id", comments: [] });
   }
+  if (!continuation) return res.status(400).json({ error: "continuation required", comments: [] });
   try {
-    for (const apiBase of apiListCache) {
-      try {
-        const url = `${apiBase}/api/comments/${videoId}${continuation ? `?continuation=${encodeURIComponent(continuation)}` : ''}`;
-        const r = await fetchWithTimeout(url, {}, 4000);
-        if (r.ok) {
-          const data = await r.json();
-          res.set("Cache-Control", "public, max-age=120");
-          return res.json(data);
-        }
-      } catch (_) { continue; }
-    }
-    return res.status(502).json({ error: "All comment sources failed", comments: [] });
+    const data = await innertube.getReplies(continuation);
+    res.set("Cache-Control", "public, max-age=120");
+    return res.json(data);
   } catch (err) {
-    return res.status(500).json({ error: "Internal Error", message: err.message, comments: [] });
+    return res.status(502).json({ error: "返信を取得できませんでした", message: err.message, comments: [] });
+  }
+});
+
+// GET /api/related/:videoId (関連動画: 本家の「次の動画」と同じ並び)
+app.get("/api/related/:videoId", async (req, res) => {
+  const videoId = req.params.videoId;
+  if (!videoId || !/^[\w-]{6,20}$/.test(videoId)) return res.status(400).json({ items: [] });
+  try {
+    const info = await innertube.getWatchInfo(videoId);
+    res.set("Cache-Control", "public, max-age=120");
+    res.json({ items: info.related || [], info: { subscriberText: info.subscriberText, likeCountText: info.likeCountText, viewCountText: info.viewCountText, dateText: info.dateText, channelId: info.channelId, channelHandle: info.channelHandle, verified: info.verified } });
+  } catch (err) {
+    res.status(502).json({ items: [], error: err.message });
+  }
+});
+
+// ── チャンネル (YouTube InnerTube) ──
+async function resolveChannelParam(q) {
+  return innertube.resolveChannelId({ id: q.id, name: q.name });
+}
+app.get("/api/channel/info", async (req, res) => {
+  try {
+    const id = await resolveChannelParam(req.query);
+    const info = await innertube.getChannel(id);
+    res.set("Cache-Control", "public, max-age=300");
+    res.json(info);
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+app.get("/api/channel/tab", async (req, res) => {
+  const kind = ['videos', 'shorts', 'playlists', 'live'].includes(req.query.kind) ? req.query.kind : 'videos';
+  try {
+    const id = await resolveChannelParam(req.query);
+    const data = await innertube.getChannelTab(id, kind, req.query.continuation || '');
+    res.set("Cache-Control", "public, max-age=120");
+    res.json({ channelId: id, kind, ...data });
+  } catch (err) {
+    res.status(502).json({ items: [], error: err.message });
   }
 });
 
@@ -4484,8 +4353,16 @@ app.get("/api/channel", async (req, res) => {
   const channelName = req.query.name || req.query.id;
   const page = parseInt(req.query.page) || 0;
   if (!channelName) return res.status(400).json({ error: "name required" });
+  // 第一候補: InnerTube でチャンネルを特定し、そのチャンネルの動画タブを返す (名前検索より正確)
+  if (page === 0) {
+    try {
+      const id = await innertube.resolveChannelId({ id: req.query.id, name: channelName });
+      const tab = await innertube.getChannelTab(id, 'videos');
+      const videos = (tab.items || []).filter(i => i.type === 'video');
+      if (videos.length) return res.json({ channelName, channelId: id, videos, nextPage: null });
+    } catch (e) { /* フォールバック */ }
+  }
   try {
-    // 取得件数を20に設定
     const results = await yts.GetListByKeyword(channelName, false, 20, page);
     const videos = (results.items || []).filter(item => item.type === 'video');
     res.json({ channelName, videos, nextPage: page + 1 });
@@ -4519,517 +4396,11 @@ app.get('/api/inv/channel/:name', async (req, res) => {
   }
 });
 
+// チャンネルページ (YouTube 風)。チャンネルID(UC...) / @ハンドル / チャンネル名 のいずれも受け付け、
+// 実データは /api/channel/info と /api/channel/tab をクライアントから取得する。
 app.get("/channel/:channelName", (req, res) => {
-  const channelName = decodeURIComponent(req.params.channelName);
-  const initial = channelName.charAt(0).toUpperCase();
-  // チャンネルごとにアバター背景色を決定（固定色・フォールバック用）
-  const colors = ['#ff0000','#ff6d00','#ffd600','#00c853','#00b0ff','#651fff','#d500f9','#f50057'];
-  const colorIndex = channelName.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % colors.length;
-  const avatarBg = colors[colorIndex];
-
-  const html = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${channelName} - MIN-Tube-Lite</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-  <script>(function(){try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.add('light-mode');}}catch(e){}})();</script>
-  <style>
-    :root {
-      --bg:#0f0f0f; --surface:#1c1c1c; --card:#232323; --hover:#303030;
-      --text:#f1f1f1; --text-sub:#a0a0a0; --text-sec:#717171;
-      --red:#ff4d4d; --border:rgba(255,255,255,0.08);
-      --avatar-bg: ${avatarBg};
-      --nav-h: 60px;
-    }
-    html.light-mode {
-      --bg:#f7f8fa; --surface:#ffffff; --card:#eef0f3; --hover:#e2e6eb;
-      --text:#14161a; --text-sub:#5e6470; --text-sec:#909090;
-      --red:#ff3b3b; --border:rgba(0,0,0,0.07);
-    }
-    * { box-sizing:border-box; margin:0; padding:0; }
-    body { background:var(--bg); color:var(--text); font-family:'Roboto',Arial,sans-serif; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s; }
-
-    /* ===== NAVBAR ===== */
-    .navbar {
-      position:fixed; top:0; width:100%; height:var(--nav-h);
-      background:var(--bg); display:flex; align-items:center;
-      padding:0 16px; z-index:1000; gap:8px;
-      border-bottom:1px solid transparent;
-    }
-    .nav-left { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-    .icon-btn {
-      background:none; border:none; color:var(--text); cursor:pointer;
-      width:40px; height:40px; border-radius:50%;
-      display:flex; align-items:center; justify-content:center;
-      transition:background .15s; flex-shrink:0;
-    }
-    .icon-btn:hover { background:var(--hover); }
-    .icon-btn svg { width:24px; height:24px; fill:var(--text); }
-    .nav-logo { display:flex; align-items:center; gap:2px; text-decoration:none; color:var(--text); }
-    .nav-logo-icon { background:var(--red); border-radius:6px; width:34px; height:24px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-    .nav-logo-icon svg { width:16px; height:16px; fill:white; }
-    .nav-logo-text { font-size:18px; font-weight:700; letter-spacing:-0.5px; margin-left:4px; }
-    .nav-logo-sub { font-size:10px; color:var(--text-sub); font-weight:500; margin-left:1px; align-self:flex-end; margin-bottom:4px; }
-    .nav-center {
-      flex:1; display:flex; align-items:center; justify-content:center;
-      max-width:640px; margin:0 auto;
-    }
-    .search-form {
-      display:flex; width:100%; height:42px;
-      border:1px solid var(--border); border-radius:999px; overflow:hidden;
-      background:var(--surface);
-    }
-    .search-form:focus-within { border-color:var(--red); }
-    .search-form input {
-      flex:1; background:var(--bg); border:none; color:var(--text);
-      padding:0 16px; outline:none; font-size:16px;
-      font-family:'Roboto',Arial,sans-serif;
-    }
-    .search-btn {
-      background:var(--surface); border:none; border-left:1px solid var(--border);
-      color:var(--text-sub); width:64px; height:100%;
-      display:flex; align-items:center; justify-content:center;
-      cursor:pointer; font-size:18px; transition:background .1s;
-    }
-    .search-btn:hover { background:var(--hover); }
-    .search-btn svg { width:20px; height:20px; fill:currentColor; }
-    .nav-right { display:flex; align-items:center; gap:4px; margin-left:auto; flex-shrink:0; }
-
-    /* ===== BANNER ===== */
-    .channel-banner {
-      margin-top:var(--nav-h); width:100%;
-      height:clamp(100px, 18vw, 200px);
-      background:linear-gradient(135deg, #1c1c2e 0%, #2d1b4e 40%, #1a2a4a 100%);
-      position:relative; overflow:hidden;
-    }
-    .channel-banner::before {
-      content:''; position:absolute; inset:0;
-      background:radial-gradient(ellipse at 20% 60%, ${avatarBg}44 0%, transparent 60%);
-    }
-    .channel-banner::after {
-      content:''; position:absolute; inset:0;
-      background:radial-gradient(ellipse at 80% 30%, rgba(255,255,255,0.05) 0%, transparent 50%);
-    }
-
-    /* ===== CHANNEL HEADER ===== */
-    .channel-header-wrap {
-      max-width:1284px; margin:0 auto; padding:0 24px 0;
-    }
-    .channel-header {
-      display:flex; align-items:center; gap:24px;
-      padding:20px 0 16px;
-    }
-    .channel-avatar {
-      width:80px; height:80px; border-radius:50%;
-      background:var(--avatar-bg);
-      display:flex; align-items:center; justify-content:center;
-      font-size:36px; font-weight:700; color:#fff;
-      flex-shrink:0; overflow:hidden; position:relative;
-      border:3px solid var(--bg);
-    }
-    @media (min-width:600px) {
-      .channel-avatar { width:160px; height:160px; font-size:64px; }
-    }
-    .channel-avatar img {
-      width:100%; height:100%; object-fit:cover;
-      display:none; position:absolute; inset:0;
-    }
-    .channel-avatar img.loaded { display:block; }
-    .avatar-initial { position:relative; z-index:1; }
-
-    .channel-info { flex:1; min-width:0; }
-    .channel-title-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
-    .channel-title {
-      font-size:clamp(18px, 4vw, 36px); font-weight:700; line-height:1.2;
-      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    }
-    .verified-badge { fill:var(--text-sub); width:16px; height:16px; display:none; flex-shrink:0; }
-    .verified-badge.show { display:block; }
-    .channel-meta {
-      font-size:14px; color:var(--text-sub); line-height:1.6;
-      margin-bottom:12px;
-    }
-    .channel-meta span + span::before { content:' • '; }
-    .channel-description {
-      font-size:14px; color:var(--text-sub); line-height:1.5;
-      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
-      overflow:hidden; max-width:600px; margin-bottom:16px;
-    }
-    .channel-actions { display:flex; align-items:center; gap:8px; }
-    .btn-subscribe {
-      background:var(--text); color:#0f0f0f;
-      border:none; border-radius:20px;
-      padding:0 16px; height:36px; font-size:14px; font-weight:500;
-      cursor:pointer; transition:opacity .15s;
-      font-family:'Roboto',Arial,sans-serif; white-space:nowrap;
-      display:flex; align-items:center;
-    }
-    .btn-subscribe:hover { opacity:0.9; }
-    .btn-subscribe.subscribed { background:var(--card); color:var(--text); }
-    .btn-subscribe.subscribed:hover { background:var(--hover); }
-    .btn-notify {
-      background:var(--card); border:none; color:var(--text);
-      width:36px; height:36px; border-radius:50%;
-      display:none; align-items:center; justify-content:center;
-      cursor:pointer; transition:background .15s, transform .2s;
-      position:relative;
-    }
-    .btn-notify.show { display:flex; }
-    .btn-notify:hover { background:var(--hover); }
-    .btn-notify svg { width:20px; height:20px; fill:var(--text); transition:transform .2s; }
-    .btn-notify.notify-on { background:var(--card); }
-    .btn-notify.notify-on svg { fill:#ff4081; animation: bell-ring 0.6s ease; }
-    @keyframes bell-ring {
-      0%,100% { transform: rotate(0); }
-      20% { transform: rotate(-15deg); }
-      40% { transform: rotate(12deg); }
-      60% { transform: rotate(-8deg); }
-      80% { transform: rotate(5deg); }
-    }
-
-    /* ===== TABS ===== */
-    .channel-tabs-wrap {
-      max-width:1284px; margin:0 auto; padding:0 24px;
-      border-bottom:1px solid var(--border);
-    }
-    .channel-tabs { display:flex; overflow-x:auto; scrollbar-width:none; }
-    .channel-tabs::-webkit-scrollbar { display:none; }
-    .tab {
-      padding:0 16px; height:48px; cursor:pointer;
-      font-size:14px; font-weight:500; letter-spacing:0.3px;
-      color:var(--text-sub); border-bottom:2px solid transparent;
-      transition:color .15s, border-color .15s; white-space:nowrap;
-      display:flex; align-items:center;
-    }
-    .tab:hover { color:var(--text); background:var(--hover); }
-    .tab.active { color:var(--text); border-bottom-color:var(--text); }
-
-    /* ===== CONTENT ===== */
-    .content { max-width:1284px; margin:0 auto; padding:20px 24px 60px; }
-    .video-grid {
-      display:grid;
-      grid-template-columns:repeat(auto-fill, minmax(240px,1fr));
-      gap:16px; row-gap:40px;
-    }
-    .video-card { text-decoration:none; color:inherit; display:flex; flex-direction:column; }
-    .thumb {
-      width:100%; aspect-ratio:16/9; border-radius:12px;
-      overflow:hidden; background:var(--card); position:relative;
-      margin-bottom:12px;
-    }
-    .thumb img { width:100%; height:100%; object-fit:cover; display:block; transition:border-radius .2s; }
-    .video-card:hover .thumb img { border-radius:0; }
-    .duration-badge {
-      position:absolute; bottom:6px; right:6px;
-      background:rgba(0,0,0,0.85); color:#fff;
-      font-size:12px; font-weight:700; padding:2px 5px; border-radius:4px;
-    }
-    .card-meta { display:flex; gap:12px; align-items:flex-start; }
-    .card-ch-avatar {
-      width:36px; height:36px; border-radius:50%;
-      background:var(--avatar-bg); flex-shrink:0;
-      display:flex; align-items:center; justify-content:center;
-      font-size:14px; font-weight:700; color:#fff; overflow:hidden;
-    }
-    .card-ch-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
-    .card-info { flex:1; min-width:0; }
-    .video-title {
-      font-size:14px; font-weight:500; line-height:1.4;
-      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
-      overflow:hidden; color:var(--text); margin-bottom:4px;
-    }
-    .video-ch-name { font-size:13px; color:var(--text-sub); margin-bottom:2px; }
-    .video-sub { font-size:13px; color:var(--text-sub); }
-
-    /* ===== LOADING / EMPTY ===== */
-    .loading { display:flex; justify-content:center; padding:60px; }
-    .spinner {
-      border:3px solid #333; border-top-color:var(--red);
-      border-radius:50%; width:40px; height:40px;
-      animation:spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    .load-more {
-      display:block; margin:32px auto; padding:0 24px; height:36px;
-      background:var(--card); border:none; color:var(--text);
-      border-radius:18px; font-size:14px; font-weight:500;
-      cursor:pointer; transition:background .15s;
-      font-family:'Roboto',Arial,sans-serif;
-    }
-    .load-more:hover { background:var(--hover); }
-    .empty { text-align:center; padding:60px; color:var(--text-sub); font-size:15px; }
-
-    /* ===== RESPONSIVE ===== */
-    @media (max-width:600px) {
-      .channel-header-wrap { padding:0 16px; }
-      .channel-header { gap:16px; padding:16px 0 12px; }
-      .channel-description { display:none; }
-      .content { padding:16px 16px 80px; }
-      .video-grid { grid-template-columns:repeat(2,1fr); gap:8px; row-gap:24px; }
-      .channel-tabs-wrap { padding:0 16px; }
-      .nav-center { display:none; }
-    }
-  </style>
-</head>
-<body>
-
-<nav class="navbar">
-  <div class="nav-left">
-    <button class="icon-btn" onclick="history.back()" aria-label="戻る">
-      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-    </button>
-    <a href="/" class="nav-logo">
-      <div class="nav-logo-icon">
-        <svg viewBox="0 0 68 48"><path d="M66.52 7.74c-.78-2.93-2.49-5.41-5.42-6.19C55.79.13 34 0 34 0S12.21.13 6.9 1.55c-2.93.78-4.63 3.26-5.42 6.19C.06 13.05 0 24 0 24s.06 10.95 1.48 16.26c.78 2.93 2.49 5.41 5.42 6.19C12.21 47.87 34 48 34 48s21.79-.13 27.1-1.55c2.93-.78 4.64-3.26 5.42-6.19C67.94 34.95 68 24 68 24s-.06-10.95-1.48-16.26z" fill="#FF0000"/><path d="M45 24 27 14v20" fill="white"/></svg>
-      </div>
-      <span class="nav-logo-text">YouTube</span><span class="nav-logo-sub">Pro</span>
-    </a>
-  </div>
-  <div class="nav-center">
-    <form class="search-form" action="/nothing/search" onsubmit="event.preventDefault(); const q=this.querySelector('input').value.trim(); if(q) window.location.href='/?q='+encodeURIComponent(q);">
-      <input type="text" placeholder="検索" name="q">
-      <button type="submit" class="search-btn">
-        <svg viewBox="0 0 24 24"><path d="M20.87 20.17l-5.59-5.59C16.35 13.35 17 11.75 17 10c0-3.87-3.13-7-7-7s-7 3.13-7 7 3.13 7 7 7c1.75 0 3.35-.65 4.58-1.71l5.59 5.59.7-.71zM10 16c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/></svg>
-      </button>
-    </form>
-  </div>
-  <div class="nav-right">
-    <a href="/" class="icon-btn" title="ホーム">
-      <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
-    </a>
-  </div>
-</nav>
-
-<div class="channel-banner"></div>
-
-<div class="channel-header-wrap">
-  <div class="channel-header">
-    <div class="channel-avatar" id="channelAvatar">
-      <img id="channelAvatarImg" src="" alt="">
-      <span class="avatar-initial" id="avatarInitial">${initial}</span>
-    </div>
-    <div class="channel-info">
-      <div class="channel-title-row">
-        <div class="channel-title" id="channelTitle">${channelName}</div>
-        <svg class="verified-badge" id="verifiedBadge" viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zM10 17l-5-5 1.4-1.4 3.6 3.6 7.6-7.6L19 8l-9 9z"/></svg>
-      </div>
-      <div class="channel-meta">
-        <span id="channelHandle">@${channelName.toLowerCase().replace(/\s+/g, '')}</span>
-        <span id="subCount"></span>
-        <span id="videoCountDisplay"></span>
-      </div>
-      <div class="channel-description" id="channelDescription"></div>
-      <div class="channel-actions">
-        <button class="btn-subscribe" id="subscribeBtn" onclick="toggleSubscribe()">チャンネル登録</button>
-        <button class="btn-notify" id="notifyBtn" aria-label="通知" title="通知を受け取る" onclick="toggleNotify()">
-          <svg id="notifyIconOff" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="channel-tabs-wrap">
-  <div class="channel-tabs">
-    <div class="tab active">動画</div>
-    <div class="tab" onclick="alert('近日公開予定')">再生リスト</div>
-    <div class="tab" onclick="alert('近日公開予定')">コミュニティ</div>
-  </div>
-</div>
-
-<div class="content">
-  <div id="videoGrid" class="video-grid"></div>
-  <div id="loading" class="loading"><div class="spinner"></div></div>
-  <button id="loadMoreBtn" class="load-more" style="display:none;" onclick="loadMore()">もっと見る</button>
-</div>
-
-<script>
-  const CHANNEL_NAME = ${safeJson(channelName)};
-  const initial = ${safeJson(initial)};
-  let currentPage = 0;
-  let isLoading = false;
-  let isEnd = false;
-  let totalLoaded = 0;
-  let channelAvatarUrl = ''; // fetchChannelInfo後に設定される
-
-  // 既存：チャンネル登録管理
-  const SUB_KEY = 'subscribed_' + CHANNEL_NAME;
-  const NOTIFY_KEY = 'notify_' + CHANNEL_NAME;
-  const BELL_ON_SVG = '<svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>';
-  const BELL_OFF_SVG = '<svg viewBox="0 0 24 24"><path d="M20 18.69L7.84 6.14 5.27 3.49 4 4.76l2.8 2.8v.01c-.52.99-.8 2.16-.8 3.42v5l-2 2v1h13.73l2 2L21 19.72l-1-1.03zM12 22c1.11 0 2-.89 2-2h-4c0 1.11.89 2 2 2zm6-7.32V11c0-3.08-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68c-.15.03-.29.08-.42.12-.1.03-.2.07-.3.11h-.01c-.01 0-.01 0-.02.01-.23.09-.46.18-.68.29 0 0-.01 0-.01.01L18 14.68z"/></svg>';
-  function updateSubscribeUI() {
-    const isSub = localStorage.getItem(SUB_KEY) === 'true';
-    const btn = document.getElementById('subscribeBtn');
-    const notifyBtn = document.getElementById('notifyBtn');
-    if (isSub) {
-      btn.textContent = '登録済み';
-      btn.classList.add('subscribed');
-      if(notifyBtn) notifyBtn.classList.add('show');
-    } else {
-      btn.textContent = 'チャンネル登録';
-      btn.classList.remove('subscribed');
-      if(notifyBtn) notifyBtn.classList.remove('show');
-    }
-    updateNotifyUI();
-  }
-  function updateNotifyUI() {
-    const notifyBtn = document.getElementById('notifyBtn');
-    if (!notifyBtn) return;
-    const isOn = localStorage.getItem(NOTIFY_KEY) === 'true';
-    if (isOn) {
-      notifyBtn.classList.add('notify-on');
-      notifyBtn.innerHTML = BELL_ON_SVG;
-      notifyBtn.title = '通知をオフにする';
-    } else {
-      notifyBtn.classList.remove('notify-on');
-      notifyBtn.innerHTML = BELL_OFF_SVG;
-      notifyBtn.title = '通知を受け取る';
-    }
-  }
-  function toggleSubscribe() {
-    const isSub = localStorage.getItem(SUB_KEY) === 'true';
-    if (isSub) {
-      localStorage.removeItem(SUB_KEY);
-      // 登録解除時は通知設定も解除
-      localStorage.removeItem(NOTIFY_KEY);
-    } else {
-      localStorage.setItem(SUB_KEY, 'true');
-      // メタ情報も保存（登録チャンネル一覧ページで使用）
-      try {
-        const meta = {
-          name: CHANNEL_NAME,
-          avatar: channelAvatarUrl || '',
-          subscribedAt: Date.now()
-        };
-        localStorage.setItem('subinfo_' + CHANNEL_NAME, JSON.stringify(meta));
-      } catch (e) {}
-    }
-    updateSubscribeUI();
-  }
-  async function toggleNotify() {
-    const isOn = localStorage.getItem(NOTIFY_KEY) === 'true';
-    if (isOn) {
-      localStorage.removeItem(NOTIFY_KEY);
-    } else {
-      // ブラウザ通知の許可をリクエスト（任意）
-      if ('Notification' in window && Notification.permission === 'default') {
-        try { await Notification.requestPermission(); } catch (e) {}
-      }
-      localStorage.setItem(NOTIFY_KEY, 'true');
-    }
-    updateNotifyUI();
-  }
-  window.toggleNotify = toggleNotify;
-
-  // 既存：フォーマット関数
-  function formatViews(v) {
-    if (!v) return '';
-    return v.replace('views', '回視聴').replace('ago', '前');
-  }
-  function formatSubscribers(n) {
-    if (!n) return 'チャンネル';
-    return n;
-  }
-
-  // 動画描画
-  function renderVideos(videos) {
-    const grid = document.getElementById('videoGrid');
-    if (videos.length === 0 && totalLoaded === 0) {
-      grid.innerHTML = '<div class="empty">動画が見つかりませんでした</div>';
-      return;
-    }
-    const html = videos.map(v => \`
-      <a href="/video/\${v.id}" class="video-card">
-        <div class="thumb">
-          <img src="https://i.ytimg.com/vi/\${v.id}/mqdefault.jpg" loading="lazy">
-          \${v.lengthText ? \`<div class="duration-badge">\${v.lengthText}</div>\` : ''}
-        </div>
-        <div class="card-meta">
-          <div class="card-ch-avatar" style="position:relative;overflow:hidden;">
-            <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:inherit;">\${initial}</span>
-            \${channelAvatarUrl ? \`<img src="\${channelAvatarUrl}" alt="\${CHANNEL_NAME}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.remove()">\` : ''}
-          </div>
-          <div class="card-info">
-            <div class="video-title">\${v.title || ''}</div>
-            <div class="video-ch-name">\${CHANNEL_NAME}</div>
-            <div class="video-sub">\${formatViews(v.viewCountText) || ''}</div>
-          </div>
-        </div>
-      </a>
-    \`).join('');
-    grid.insertAdjacentHTML('beforeend', html);
-    totalLoaded += videos.length;
-    const countDisp = document.getElementById('videoCountDisplay');
-    if (countDisp) countDisp.textContent = '動画 ' + totalLoaded + ' 本';
-  }
-
-  // 動画取得コア関数
-  async function loadVideos() {
-    if (isLoading || isEnd) return;
-    isLoading = true;
-    document.getElementById('loading').style.display = 'flex';
-    
-    try {
-      const res = await fetch(\`/api/channel?name=\${encodeURIComponent(CHANNEL_NAME)}&page=\${currentPage}\`);
-      const data = await res.json();
-      if (!data.videos || data.videos.length === 0) {
-        isEnd = true;
-        document.getElementById('loading').innerHTML = '<p style="color:var(--text-sub);padding:20px;">すべての動画を読み込みました</p>';
-      } else {
-        renderVideos(data.videos);
-        currentPage = data.nextPage;
-      }
-    } catch (e) {
-      isEnd = true;
-    } finally {
-      isLoading = false;
-      if (!isEnd) document.getElementById('loading').style.display = 'none';
-    }
-  }
-
-  // 追加：無限スクロール監視 (Intersection Observer)
-  function initInfiniteScroll() {
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) loadVideos();
-    }, { rootMargin: '400px' });
-    observer.observe(document.getElementById('loading'));
-  }
-
-  // 既存：チャンネル情報取得
-  async function fetchChannelInfo() {
-    try {
-      const res = await fetch(\`/api/inv/channel/\${encodeURIComponent(CHANNEL_NAME)}\`);
-      const data = await res.json();
-      const c = Array.isArray(data) ? data[0] : data;
-      if (c) {
-        if (c.authorThumbnails?.length) {
-          const avatarSrc = c.authorThumbnails[c.authorThumbnails.length-1].url;
-          channelAvatarUrl = avatarSrc; // renderVideos で使用
-          const img = document.getElementById('channelAvatarImg');
-          img.src = avatarSrc;
-          img.onload = () => { img.classList.add('loaded'); document.getElementById('avatarInitial').style.display='none'; };
-        }
-        if (c.description) document.getElementById('channelDescription').textContent = c.description;
-        if (c.subCount) document.getElementById('subCount').textContent = c.subCount + ' 人の登録者';
-      }
-    } catch(e) {}
-  }
-
-  // 初期化
-  async function init() {
-    updateSubscribeUI();
-    await fetchChannelInfo();
-    await loadVideos(); // 初回20件
-    initInfiniteScroll(); // 以降自動
-  }
-  init();
-</script>
-</body>
-</html>`;
-  res.send(html);
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, 'views', 'channel.html'));
 });
 
 

@@ -792,7 +792,7 @@ app.get('/playlist', async (req, res) => {
 <script>
 (async () => {
   try {
-    const r = await fetch('/api/playlist/' + encodeURIComponent(${JSON.stringify(listId)}));
+    const r = await fetch('/api/playlist/' + encodeURIComponent(${safeJson(listId)}));
     const data = await r.json();
     const items = data.items || [];
     const meta = data.metadata || {};
@@ -1600,6 +1600,26 @@ app.get("/api/recommendations", async (req, res) => {
   }
 });
 
+// <script> 内に JSON を埋め込む際の安全なシリアライズ ("</script>" や U+2028 で
+// スクリプトが壊れるのを防ぐ)
+function safeJson(v) {
+  return JSON.stringify(v === undefined ? null : v)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+// コメント API のレスポンスを検証 (Invidious のインスタンス選択 HTML などが
+// 返ってきた場合に空のコメントへフォールバックする)
+function sanitizeComments(data) {
+  if (!data || typeof data !== 'object' || !Array.isArray(data.comments)) {
+    return { commentCount: 0, comments: [] };
+  }
+  return data;
+}
+
 app.get("/video/:id", async (req, res, next) => {
 const videoId = req.params.id;
 try {
@@ -1629,7 +1649,7 @@ for (const apiBase of apiListCache) {
 
     try {
       const cRes = await fetchWithTimeout(`${apiBase}/api/comments/${videoId}`, {}, 3000);
-      if (cRes.ok) commentsData = await cRes.json();
+      if (cRes.ok) commentsData = sanitizeComments(await cRes.json());
     } catch (e) {}
 
     successfulApi = apiBase;
@@ -1645,7 +1665,7 @@ for (const apiBase of apiListCache) {
           
           try {
             const cRes = await fetchWithTimeout(`${apiBase}/api/comments/${videoId}`, {}, 3000);
-            if (cRes.ok) commentsData = await cRes.json();
+            if (cRes.ok) commentsData = sanitizeComments(await cRes.json());
           } catch (e) {}
 
           successfulApi = apiBase; 
@@ -1661,7 +1681,7 @@ if (!videoData) {
   videoData = { videoTitle: "再生できない動画", stream_url: "youtube-nocookie" };
 }
 
-console.log(commentsData)
+commentsData = sanitizeComments(commentsData);
 let isShortForm = videoData.videoTitle.includes('#');
 
 if (isShortForm) {
@@ -1871,8 +1891,8 @@ const shortsHtml = `
         };
 
         /* ===== コメントレンダリング (Shorts) ===== */
-        const __SHORTS_COMMENTS_DATA = ${JSON.stringify(commentsData || { commentCount: 0, comments: [] })};
-        const __SHORTS_VIDEO_ID = ${JSON.stringify(videoId)};
+        const __SHORTS_COMMENTS_DATA = ${safeJson(commentsData || { commentCount: 0, comments: [] })};
+        const __SHORTS_VIDEO_ID = ${safeJson(videoId)};
         let __shortsCommentsRendered = false;
 
         function shortsEscapeHtml(s) {
@@ -2061,7 +2081,7 @@ const shortsHtml = `
             try {
               const meta = {
                 name: SHORT_CHANNEL,
-                avatar: ${JSON.stringify(videoData.channelImage || '')},
+                avatar: ${safeJson(videoData.channelImage || '')},
                 subscribedAt: Date.now()
               };
               localStorage.setItem('subinfo_' + SHORT_CHANNEL, JSON.stringify(meta));
@@ -2359,7 +2379,7 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
 <nav class="navbar">
     <div class="nav-left"><a href="/" class="logo"><i class="fab fa-youtube"></i>YouTube Pro</a></div>
     <div class="nav-center">
-        <form class="search-bar" action="/nothing/search">
+        <form class="search-bar" action="/" method="get" onsubmit="return mtVideoSearchSubmit(this)">
             <input type="text" name="q" id="searchInput" placeholder="検索" autocomplete="off">
             <button type="submit" class="search-btn"><i class="fas fa-search"></i></button>
         </form>
@@ -2487,7 +2507,7 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
     function toggleServerMenu() { document.getElementById('serverMenu').classList.toggle('show'); }
     window.addEventListener('click', function(e) { if (!e.target.closest('.server-dropdown-container')) { const menu = document.getElementById('serverMenu'); if (menu && menu.classList.contains('show')) menu.classList.remove('show'); } });
 
-    const VIDEO_CHANNEL = ${JSON.stringify(videoData.channelName || '')};
+    const VIDEO_CHANNEL = ${safeJson(videoData.channelName || '')};
     const SUB_KEY_VIDEO = 'subscribed_' + VIDEO_CHANNEL;
     const subBtn = document.getElementById('subBtn');
     function updateSubBtnUI() {
@@ -2512,7 +2532,7 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
         try {
           const meta = {
             name: VIDEO_CHANNEL,
-            avatar: ${JSON.stringify(videoData.channelImage || '')},
+            avatar: ${safeJson(videoData.channelImage || '')},
             subscribedAt: Date.now()
           };
           localStorage.setItem('subinfo_' + VIDEO_CHANNEL, JSON.stringify(meta));
@@ -2591,8 +2611,8 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
     /* ======================================================
      * コメントレンダリング
      * ====================================================== */
-    const __COMMENTS_DATA = ${JSON.stringify(commentsData || { commentCount: 0, comments: [] })};
-    const __VIDEO_ID_FOR_COMMENTS = ${JSON.stringify(videoId)};
+    const __COMMENTS_DATA = ${safeJson(commentsData || { commentCount: 0, comments: [] })};
+    const __VIDEO_ID_FOR_COMMENTS = ${safeJson(videoId)};
     let __commentSortMode = 'top'; // 'top' or 'new'
 
     function escapeHtml(str) {
@@ -2901,7 +2921,7 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
     window.selectSuggestion = function(el) {
         searchInput.value = decodeURIComponent(el.getAttribute('data-query'));
         autocompleteDropdown.style.display = 'none';
-        searchInput.closest('form').submit();
+        const f = searchInput.closest('form'); if (f.requestSubmit) f.requestSubmit(); else if (mtVideoSearchSubmit(f)) f.submit();
     };
 
     document.addEventListener('click', (e) => {
@@ -3049,11 +3069,11 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
         if (__dlLoaded) return;
         const list = document.getElementById('downloadMenuList');
         if (!list) return;
-        const videoId = ${JSON.stringify(videoId)};
-        const title = ${JSON.stringify(videoData.videoTitle || 'video')};
+        const videoId = ${safeJson(videoId)};
+        const title = ${safeJson(videoData.videoTitle || 'video')};
         const safeName = title.replace(/[\\\\\\/:*?"<>|]/g, '_').slice(0, 80);
         // ストリームURL (元データ) があれば最優先で提供
-        const directUrl = ${JSON.stringify(videoData.stream_url || '')};
+        const directUrl = ${safeJson(videoData.stream_url || '')};
         const items = [];
         if (directUrl && directUrl !== 'youtube-nocookie' && /^https?:/.test(directUrl)) {
             items.push({ url: directUrl, label: '元ストリーム', badge: 'MP4', download: safeName + '.mp4' });
@@ -3104,8 +3124,8 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
     (function buildHashtags() {
         const bar = document.getElementById('hashtagBar');
         if (!bar) return;
-        const title = ${JSON.stringify(videoData.videoTitle || '')};
-        const desc  = ${JSON.stringify(videoData.videoDes || '')};
+        const title = ${safeJson(videoData.videoTitle || '')};
+        const desc  = ${safeJson(videoData.videoDes || '')};
         const text = title + ' ' + desc;
         // 全角/半角 # を許容し、日本語/英数字/_/- を1〜30文字
         const re = /[#＃]([\\p{L}\\p{N}_\\-]{1,30})/gu;
@@ -3123,14 +3143,14 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
         }
         if (found.length === 0) { bar.style.display = 'none'; return; }
         bar.innerHTML = found.map(t =>
-            '<a class="hashtag-chip" href="/nothing/search?q=' + encodeURIComponent('#' + t) + '">#' + t + '</a>'
+            '<a class="hashtag-chip" href="/?q=' + encodeURIComponent('#' + t) + '">#' + t + '</a>'
         ).join('');
     })();
 
     // ===== 5. 共有ボタン =====
     function shareVideo() {
         const url = location.href;
-        const title = ${JSON.stringify(videoData.videoTitle || '')};
+        const title = ${safeJson(videoData.videoTitle || '')};
         if (navigator.share) {
             navigator.share({ title, url }).catch(() => {});
         } else if (navigator.clipboard) {
@@ -3150,12 +3170,40 @@ const streamEmbedPlaceholder = `<div style="width:100%;height:100%;display:flex;
     // home.html と同じ localStorage スキーマ (mt_playlists) を共有
     const PL_LIB_KEY = 'mt_playlists';
     const PL_CURRENT_ITEM = {
-        id: ${JSON.stringify(videoId)},
-        title: ${JSON.stringify(videoData.videoTitle || '')},
-        channel: ${JSON.stringify(videoData.channelName || '')},
-        thumbnail: 'https://i.ytimg.com/vi/' + ${JSON.stringify(videoId)} + '/mqdefault.jpg',
+        id: ${safeJson(videoId)},
+        title: ${safeJson(videoData.videoTitle || '')},
+        channel: ${safeJson(videoData.channelName || '')},
+        thumbnail: 'https://i.ytimg.com/vi/' + ${safeJson(videoId)} + '/mqdefault.jpg',
         type: 'video'
     };
+
+    // ===== 7. 視聴履歴 / 検索履歴 (ホームと同じ localStorage スキーマを共有) =====
+    function mtLibGet(key) { try { const v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+    function mtLibSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
+    function mtRecordWatch(item) {
+        if (!item || !item.id || !item.title) return;
+        let hist = mtLibGet('mt_history').filter(h => h && h.id !== item.id);
+        hist.unshift({ id: item.id, title: item.title, channel: item.channel || '', views: item.views || '', published: item.published || '', ts: Date.now() });
+        mtLibSet('mt_history', hist.slice(0, 200));
+    }
+    function mtRecordSearch(q) {
+        q = (q || '').trim();
+        if (!q) return;
+        let sh = mtLibGet('mt_search_history').filter(x => x && x.query !== q);
+        sh.unshift({ query: q, ts: Date.now() });
+        mtLibSet('mt_search_history', sh.slice(0, 100));
+    }
+    function mtVideoSearchSubmit(form) {
+        const input = form.querySelector('input[name="q"]');
+        const q = input ? input.value.trim() : '';
+        if (!q) return false;
+        mtRecordSearch(q);
+        return true;
+    }
+    window.mtVideoSearchSubmit = mtVideoSearchSubmit;
+    if (${safeJson(videoData.videoTitle || '')} && ${safeJson(videoData.videoTitle || '')} !== '再生できない動画') {
+        mtRecordWatch({ id: ${safeJson(videoId)}, title: ${safeJson(videoData.videoTitle || '')}, channel: ${safeJson(videoData.channelName || '')} });
+    }
 
     function plGet() { try { return JSON.parse(localStorage.getItem(PL_LIB_KEY) || '[]'); } catch (e) { return []; } }
     function plSet(v) { try { localStorage.setItem(PL_LIB_KEY, JSON.stringify(v)); } catch (e) {} }
@@ -3460,7 +3508,7 @@ app.get('/pro-stream/:videoId', (req, res) => {
 </div>
 
 <script>
-const VIDEO_ID = ${JSON.stringify(videoId)};
+const VIDEO_ID = ${safeJson(videoId)};
 const ENDPOINTS = [
   {name:'/scratch-edu', path:'/scratch-edu/' + VIDEO_ID},
   {name:'/kahoot-edu', path:'/kahoot-edu/' + VIDEO_ID},
@@ -4799,8 +4847,8 @@ app.get("/channel/:channelName", (req, res) => {
 </div>
 
 <script>
-  const CHANNEL_NAME = ${JSON.stringify(channelName)};
-  const initial = ${JSON.stringify(initial)};
+  const CHANNEL_NAME = ${safeJson(channelName)};
+  const initial = ${safeJson(initial)};
   let currentPage = 0;
   let isLoading = false;
   let isEnd = false;
